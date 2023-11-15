@@ -58,7 +58,7 @@ class ExplicitWorkflow(BaseWorkflow):
         val_dataset = dataset.get_validation_dataset()
         val_dataloader = DataLoader(val_dataset, **self.config.val_dataloader)
 
-        # self.model.set_normalizer(normalizer)
+        self.model.set_normalizer(normalizer)
 
         lr_scheduler = torch_utils.CosineWarmupScheduler(
             self.optimizer,

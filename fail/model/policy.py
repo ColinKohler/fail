@@ -9,6 +9,7 @@ from escnn import group
 
 from fail.model.layers import MLP, CNN
 from fail.model.transformer import Transformer
+from fail.utils.normalizer import LinearNormalizer
 
 
 def initWeights(m):
@@ -46,6 +47,8 @@ class StochasticPolicy(nn.Module):
     def __init__(self, action_dim=3, seq_len=20, z_dim=256, dropout=0.1):
         super().__init__()
 
+        self.normalizer = LinearNormalizer()
+
         self.action_dim = action_dim
         self.encoder = Encoder(z_dim, seq_len, dropout)
         self.policy = nn.Sequential(
@@ -55,6 +58,9 @@ class StochasticPolicy(nn.Module):
         )
 
         self.apply(initWeights)
+
+    def set_normalizer(self, normalizer: LinearNormalizer):
+        self.normalizer.load_state_dict(normalizer.state_dict())
 
     def forward(self, x):
         batch_size = x.size(0)

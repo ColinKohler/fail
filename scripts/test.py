@@ -38,8 +38,10 @@ def test(checkpoint, num_eps=100, render=False):
     workflow.load_payload(payload, exclude_keys=None, include_keys=None)
 
     policy = workflow.model
+    normalizer = policy.normalizer
     policy.to(device)
     policy.eval()
+
 
     pbar = tqdm(total=num_eps)
     pbar.set_description("0/0 (0%)")
