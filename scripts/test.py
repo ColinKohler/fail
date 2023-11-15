@@ -4,12 +4,14 @@ sys.path.insert(0, os.path.abspath('.'))
 
 import copy
 import time
+import hydra
 import numpy as np
 import numpy.random as npr
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import pickle
+import dill
 from skimage.transform import resize
 import argparse
 from utils import torch_utils
@@ -17,21 +19,25 @@ import collections
 
 from pydrake.geometry import StartMeshcat
 
-from peg_insertion_envs.robot_insertion_3d_env import createPegInsertionEnv
-from models.policy import StochasticPolicy
+from drake_ws.peg_insertion_envs.robot_insertion_3d_env import createPegInsertionEnv
+from fail.workflows.base_workflow import BaseWorkflow
 
-def test(num_eps, model_path, obs_horizon=2, obs_key_points=10, render=False):
+def test(checkpoint, num_eps=100, render=False):
   meshcat = StartMeshcat() if render else None
   env = createPegInsertionEnv(meshcat=meshcat)
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-  seq_len = obs_horizon * obs_key_points
-  model_save_state = pickle.load(open(model_path, 'rb'))
-  policy = StochasticPolicy(n_act=3, seq_len=seq_len)
-  policy.load_state_dict(model_save_state['weights'])
-  policy = policy.to(device)
+  payload = torch.load(open(checkpoint, 'rb'), pickle_module=dill)
+  config = payload['config']
+  cls = hydra.utils.get_class(config._target_)
+
+  workflow = cls(config)
+  workflow: BaseWorkflow
+  workflow.load_payload(payload, exclude_keys=None, include_keys=None)
+
+  policy = workflow.model
+  policy.to(device)
   policy.eval()
-  normalizer = model_save_state['normalizer']
 
   pbar = tqdm(total=num_eps)
   pbar.set_description('0/0 (0%)')
@@ -100,18 +106,6 @@ if __name__ == '__main__':
     action='store_true',
     help='Render the env using meshcat.'
   )
-  parser.add_argument(
-    '--obs_horizon',
-    type=int,
-    default=2,
-    help='Number of timsteps to include in an observation.'
-  )
-  parser.add_argument(
-    '--obs_key_points',
-    type=int,
-    default=10,
-    help='Number of points in each action trajectory.'
-  )
 
   args = parser.parse_args()
-  test(args.num_eps, args.model_path, obs_horizon=args.obs_horizon, obs_key_points=args.obs_key_points, render=args.render)
+  test(args.model_path, args.num_eps, render=args.render)
