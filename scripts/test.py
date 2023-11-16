@@ -39,10 +39,8 @@ def test(checkpoint, num_eps=100, render=False):
     workflow.load_payload(payload, exclude_keys=None, include_keys=None)
 
     policy = workflow.model
-    normalizer = policy.normalizer
     policy.to(device)
     policy.eval()
-
 
     pbar = tqdm(total=num_eps)
     pbar.set_description("0/0 (0%)")
@@ -50,38 +48,10 @@ def test(checkpoint, num_eps=100, render=False):
 
     for eps in range(num_eps):
         goal, obs = env.reset()
-        ngoal = normalizer["goal"].normalize(goal)
         obs_deque = collections.deque([obs] * config.obs_horizon, maxlen=config.obs_horizon)
         terminate = False
-        # hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
-        hole_noise = 0
-        # print(hole_noise)
         while not terminate:
-            obs_seq = np.stack(obs_deque)
-            nobs = normalizer["obs"].normalize(obs_seq)
-            policy_obs = nobs.unsqueeze(0).flatten(1, 2)
-            # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
-            policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, config.policy.seq_len, 1) - (
-                policy_obs[:, :, :3] + hole_noise
-            )
-            policy_obs = policy_obs.to(device)
-
-            with torch.no_grad():
-                _, _, policy_action = policy.sample(policy_obs)
-                policy_action = policy_action.cpu().squeeze().numpy()
-                # attn_maps = policy.encoder.transformer.getAttnMaps(policy_obs)
-                # torch_utils.plotAttnMaps(torch.arange(seq_len).view(1,seq_len), attn_maps)
-            action = normalizer["action"].unnormalize(policy_action).cpu()
-            # print('force action: {}'.format(np.round(action, 3)))
-            # f = obs[:,3:]
-            # plt.plot(f[:,0], label='Mx')
-            # plt.plot(f[:,1], label='My')
-            # plt.plot(f[:,2], label='Mz')
-            # plt.plot(f[:,3], label='Fx')
-            # plt.plot(f[:,4], label='Fy')
-            # plt.plot(f[:,5], label='Fz')
-            # plt.legend()
-            # plt.show()
+            action = policy.get_action(obs_deque, goal, device)
             obs_, reward, terminate, timeout = env.step(action)
 
             obs = obs_

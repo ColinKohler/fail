@@ -8,13 +8,15 @@ from escnn import group
 
 
 class MLP(nn.Module):
-    def __init__(self, hiddens):
+    def __init__(self, hiddens, act_out=True):
         super().__init__()
 
         layers = list()
-        for h, h_ in zip(hiddens, hiddens[1:]):
+        for i, (h, h_) in enumerate(zip(hiddens, hiddens[1:])):
             layers.append(nn.Linear(h, h_))
-            layers.append(nn.LeakyReLU(0.01, inplace=True))
+            is_last_layer = i == len(hiddens) - 2
+            if not is_last_layer or act_out:
+                layers.append(nn.LeakyReLU(0.01, inplace=True))
         self.mlp = nn.Sequential(*layers)
 
     def forward(self, x):

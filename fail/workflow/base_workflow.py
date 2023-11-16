@@ -48,7 +48,7 @@ class BaseWorkflow(object):
         if exclude_keys is None:
             exclude_keys = tuple(self.exclude_keys)
         if include_keys is None:
-            include_keys = tuple(self.include_keys) + ('_output_dir',)
+            include_keys = tuple(self.include_keys) + ("_output_dir",)
 
         path.parent.mkdir(parents=False, exist_ok=True)
         payload = {"config": self.config, "state_dicts": dict(), "pickles": dict()}

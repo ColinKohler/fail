@@ -12,7 +12,14 @@ class DictOfTensorMixin(nn.Module):
         return next(iter(self.parameters())).device
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         def dfs_add(dest, keys, value: torch.Tensor):
             if len(keys) == 1:

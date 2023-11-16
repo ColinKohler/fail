@@ -14,7 +14,7 @@ import wandb
 
 from fail.dataset.base_dataset import BaseDataset
 from fail.workflow.base_workflow import BaseWorkflow
-from fail.model.policy import StochasticPolicy
+from fail.policy.explicit_policy import ExplicitPolicy
 from fail.utils import torch_utils
 from fail.utils.json_logger import JsonLogger
 
@@ -33,7 +33,7 @@ class ExplicitWorkflow(BaseWorkflow):
         npr.seed(seed)
         random.seed(seed)
 
-        self.model: StochasticPolicy
+        self.model: ExplicitPolicy
         self.model = hydra.utils.instantiate(config.policy)
         self.optimizer = hydra.utils.instantiate(
             config.optimizer, params=self.model.parameters()
@@ -95,24 +95,12 @@ class ExplicitWorkflow(BaseWorkflow):
                     mininterval=self.config.training.tqdm_interval_sec,
                 ) as tepoch:
                     for batch_idx, batch in enumerate(tepoch):
-                        # Load batch
-                        nobs, naction = batch["obs"].float().to(device), batch[
-                            "action"
-                        ].float().to(device)
-                        ngoal = batch["goal"].float().to(device)
-                        B = nobs.shape[0]
-                        obs = nobs.flatten(1, 2)
-                        # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
-                        obs[:, :, :3] = (
-                            ngoal[:, 0, :]
-                            .unsqueeze(1)
-                            .repeat(1, self.config.policy.seq_len, 1)
-                            - obs[:, :, :3]
+                        batch = torch_utils.dict_apply(
+                            batch, lambda x: x.to(device, non_blocking=True)
                         )
 
                         # Compute loss
-                        mean, log_prob, pred_action = self.model.sample(obs)
-                        loss = criterion(mean, naction[:, -1])
+                        loss = self.model.compute_loss(batch)
                         loss.backward()
 
                         # Optimization
@@ -153,24 +141,12 @@ class ExplicitWorkflow(BaseWorkflow):
                             mininterval=self.config.training.tqdm_interval_sec,
                         ) as tepoch:
                             for batch_idx, batch in enumerate(tepoch):
-                                # Load batch
-                                nobs, naction = batch["obs"].float().to(device), batch[
-                                    "action"
-                                ].float().to(device)
-                                ngoal = batch["goal"].float().to(device)
-                                B = nobs.shape[0]
-                                obs = nobs.flatten(1, 2)
-                                # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
-                                obs[:, :, :3] = (
-                                    ngoal[:, 0, :]
-                                    .unsqueeze(1)
-                                    .repeat(1, self.config.policy.seq_len, 1)
-                                    - obs[:, :, :3]
+                                batch = torch_utils.dict_apply(
+                                    batch, lambda x: x.to(device, non_blocking=True)
                                 )
 
                                 # Compute loss
-                                mean, log_prob, pred_action = self.model.sample(obs)
-                                loss = criterion(mean, naction[:, -1]).item()
+                                loss = self.model.compute_loss(batch)
                                 val_losses.append(loss)
 
                                 if len(val_losses) > 0:

@@ -6,22 +6,22 @@ import numbers
 import pandas as pd
 
 
-def read_json_log(path: str,
-        required_keys: Sequence[str]=tuple(),
-        **kwargs) -> pd.DataFrame:
+def read_json_log(
+    path: str, required_keys: Sequence[str] = tuple(), **kwargs
+) -> pd.DataFrame:
     """
     Read json-per-line file, with potentially incomplete lines.
     kwargs passed to pd.read_json
     """
     lines = list()
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         while True:
             # one json per line
             line = f.readline()
             if len(line) == 0:
                 # EOF
                 break
-            elif not line.endswith('\n'):
+            elif not line.endswith("\n"):
                 # incomplete line
                 break
             is_relevant = False
@@ -33,15 +33,19 @@ def read_json_log(path: str,
                 lines.append(line)
     if len(lines) < 1:
         return pd.DataFrame()
-    json_buf = f'[{",".join([line for line in (line.strip() for line in lines) if line])}]'
+    json_buf = (
+        f'[{",".join([line for line in (line.strip() for line in lines) if line])}]'
+    )
     df = pd.read_json(json_buf, **kwargs)
     return df
 
+
 class JsonLogger:
-    def __init__(self, path: str,
-            filter_fn: Optional[Callable[[str,Any],bool]]=None):
+    def __init__(
+        self, path: str, filter_fn: Optional[Callable[[str, Any], bool]] = None
+    ):
         if filter_fn is None:
-            filter_fn = lambda k,v: isinstance(v, numbers.Number)
+            filter_fn = lambda k, v: isinstance(v, numbers.Number)
 
         # default to append mode
         self.path = path
@@ -52,9 +56,9 @@ class JsonLogger:
     def start(self):
         # use line buffering
         try:
-            self.file = file = open(self.path, 'r+', buffering=1)
+            self.file = file = open(self.path, "r+", buffering=1)
         except FileNotFoundError:
-            self.file = file = open(self.path, 'w+', buffering=1)
+            self.file = file = open(self.path, "w+", buffering=1)
 
         # Move the pointer (similar to a cursor in a text editor) to the end of the file
         pos = file.seek(0, os.SEEK_END)
@@ -70,7 +74,7 @@ class JsonLogger:
         last_line_end = file.tell()
 
         # find the start of second last line
-        pos = max(0, pos-1)
+        pos = max(0, pos - 1)
         file.seek(pos, os.SEEK_SET)
         while pos > 0 and file.read(1) != "\n":
             pos -= 1
@@ -99,8 +103,7 @@ class JsonLogger:
         self.stop()
 
     def log(self, data: dict):
-        filtered_data = dict(
-            filter(lambda x: self.filter_fn(*x), data.items()))
+        filtered_data = dict(filter(lambda x: self.filter_fn(*x), data.items()))
         # save current as last log
         self.last_log = filtered_data
         for k, v in filtered_data.items():
@@ -110,7 +113,7 @@ class JsonLogger:
                 filtered_data[k] = float(v)
         buf = json.dumps(filtered_data)
         # ensure one line per json
-        buf = buf.replace('\n','') + '\n'
+        buf = buf.replace("\n", "") + "\n"
         self.file.write(buf)
 
     def get_last_log(self):
