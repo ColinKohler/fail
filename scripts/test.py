@@ -2,6 +2,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(0, os.path.abspath(".."))
 
 import copy
 import time
@@ -15,13 +16,13 @@ import pickle
 import dill
 from skimage.transform import resize
 import argparse
-from utils import torch_utils
 import collections
 
 from pydrake.geometry import StartMeshcat
 
 from drake_ws.peg_insertion_envs.robot_insertion_3d_env import createPegInsertionEnv
-from fail.workflows.base_workflow import BaseWorkflow
+from fail.workflow.base_workflow import BaseWorkflow
+from fail.utils import torch_utils
 
 
 def test(checkpoint, num_eps=100, render=False):
@@ -50,7 +51,7 @@ def test(checkpoint, num_eps=100, render=False):
     for eps in range(num_eps):
         goal, obs = env.reset()
         ngoal = normalizer["goal"].normalize(goal)
-        obs_deque = collections.deque([obs] * obs_horizon, maxlen=obs_horizon)
+        obs_deque = collections.deque([obs] * config.obs_horizon, maxlen=config.obs_horizon)
         terminate = False
         # hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
         hole_noise = 0
@@ -60,7 +61,7 @@ def test(checkpoint, num_eps=100, render=False):
             nobs = normalizer["obs"].normalize(obs_seq)
             policy_obs = nobs.unsqueeze(0).flatten(1, 2)
             # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
-            policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, seq_len, 1) - (
+            policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, config.policy.seq_len, 1) - (
                 policy_obs[:, :, :3] + hole_noise
             )
             policy_obs = policy_obs.to(device)
@@ -70,7 +71,7 @@ def test(checkpoint, num_eps=100, render=False):
                 policy_action = policy_action.cpu().squeeze().numpy()
                 # attn_maps = policy.encoder.transformer.getAttnMaps(policy_obs)
                 # torch_utils.plotAttnMaps(torch.arange(seq_len).view(1,seq_len), attn_maps)
-            action = normalizer["action"].unnormalize(policy_action)
+            action = normalizer["action"].unnormalize(policy_action).cpu()
             # print('force action: {}'.format(np.round(action, 3)))
             # f = obs[:,3:]
             # plt.plot(f[:,0], label='Mx')

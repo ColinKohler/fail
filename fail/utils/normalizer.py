@@ -86,19 +86,19 @@ class LinearNormalizer(DictOfTensorMixin):
                 result[key] = value["input_stats"]
         return result
 
-        def get_output_stats(self, key="_default"):
-            input_stats = self.get_input_stats()
-            if "min" in input_stats:
-                # no dict
-                return torch_utils.dict_apply(input_stats, self.normalize)
+    def get_output_stats(self, key="_default"):
+        input_stats = self.get_input_stats()
+        if "min" in input_stats:
+            # no dict
+            return torch_utils.dict_apply(input_stats, self.normalize)
 
-            result = dict()
-            for key, group in input_stats.items():
-                this_dict = dict()
-                for name, value in group.items():
-                    this_dict[name] = self.normalize({key: value})[key]
-                result[key] = this_dict
-            return result
+        result = dict()
+        for key, group in input_stats.items():
+            this_dict = dict()
+            for name, value in group.items():
+                this_dict[name] = self.normalize({key: value})[key]
+            result[key] = this_dict
+        return result
 
 
 class SingleFieldLinearNormalizer(DictOfTensorMixin):
