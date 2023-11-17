@@ -16,6 +16,8 @@ class ImplicitPolicy(BasePolicy):
     def __init__(self, action_dim, num_neg_act_samples, pred_n_iter, pred_n_samples, seq_len, z_dim, dropout):
         super().__init__(action_dim, seq_len, z_dim)
         self.num_neg_act_samples = num_neg_act_samples
+        self.pred_n_iter = pred_n_iter
+        self.pred_n_samples = pred_n_samples
 
         self.encoder = PoseForceEncoder(z_dim, seq_len, dropout)
         self.energy_mlp = MLP([z_dim+action_dim, z_dim // 2, 1], act_out=False)
@@ -52,18 +54,16 @@ class ImplicitPolicy(BasePolicy):
             low=action_stats['min'],
             high=action_stats['max']
         )
-        self.num_neg_act_samples=1024
-        samples = action_dist.sample((1, self.num_neg_act_samples)).to(dtype=policy_obs.dtype)
+        samples = action_dist.sample((1, self.pred_n_samples)).to(dtype=policy_obs.dtype)
 
         zero = torch.tensor(0, device=device)
         resample_std = torch.tensor(3e-2, device=device)
-        self.pred_n_iter = 5
         for i in range(self.pred_n_iter):
             logits = self.forward(policy_obs, samples)
             prob = torch.softmax(logits, dim=-1)
 
             if i < (self.pred_n_iter - 1):
-                idxs = torch.multinomial(prob, self.num_neg_act_samples, replacement=True)
+                idxs = torch.multinomial(prob, self.pred_n_samples, replacement=True)
                 samples = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs]
                 samples += torch.normal(zero, resample_std, size=samples.shape, device=device)
 
