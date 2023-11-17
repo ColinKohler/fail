@@ -20,7 +20,7 @@ class ImplicitPolicy(BasePolicy):
         self.pred_n_samples = pred_n_samples
 
         self.encoder = PoseForceEncoder(z_dim, seq_len, dropout)
-        self.energy_mlp = MLP([z_dim+action_dim, z_dim // 2, 1], act_out=False)
+        self.energy_mlp = MLP([z_dim+action_dim, z_dim, z_dim, z_dim, z_dim, 1], act_out=False)
 
         self.apply(torch_utils.init_weights)
 
@@ -110,8 +110,8 @@ class ImplicitPolicy(BasePolicy):
         ground_truth = (permutation == 0).nonzero()[:,1].to(naction.device)
 
         energy = self.forward(obs, targets)
-        logits = -1.0 * energy
-        loss = F.cross_entropy(logits, ground_truth)
+        #logits = -1.0 * energy
+        loss = F.cross_entropy(energy, ground_truth)
 
         return loss
 
