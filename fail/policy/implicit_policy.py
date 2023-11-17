@@ -39,7 +39,8 @@ class ImplicitPolicy(BasePolicy):
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
         nobs = self.normalizer["obs"].normalize(np.stack(obs))
-        hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+        #hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+        hole_noise = 0
 
         policy_obs = nobs.unsqueeze(0).flatten(1, 2)
         # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
@@ -67,9 +68,8 @@ class ImplicitPolicy(BasePolicy):
                 samples = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs]
                 samples += torch.normal(zero, resample_std, size=samples.shape, device=device)
 
-            idxs = torch.multinomial(prob, num_samples=1, replacement=True)
-            acts_n = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs].squeeze(1)
-
+        idxs = torch.multinomial(prob, num_samples=1, replacement=True)
+        acts_n = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs].squeeze(1)
         action = self.normalizer["action"].unnormalize(acts_n).cpu().squeeze()
 
         return action
