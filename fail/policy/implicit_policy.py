@@ -13,7 +13,7 @@ from fail.policy.base_policy import BasePolicy
 
 
 class ImplicitPolicy(BasePolicy):
-    def __init__(self, action_dim, num_neg_act_samples, seq_len, z_dim, dropout):
+    def __init__(self, action_dim, num_neg_act_samples, pred_n_iter, pred_n_samples, seq_len, z_dim, dropout):
         super().__init__(action_dim, seq_len, z_dim)
         self.num_neg_act_samples = num_neg_act_samples
 
