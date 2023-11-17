@@ -184,7 +184,7 @@ class SingleFieldLinearNormalizer(DictOfTensorMixin):
         return self.params_dict["input_stats"]
 
     def get_output_stats(self):
-        return dict_apply(self.params_dict["input_stats"], self.normalize)
+        return torch_utils.dict_apply(self.params_dict["input_stats"], self.normalize)
 
     def __call__(self, x: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
         return self.normalize(x)

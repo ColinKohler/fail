@@ -7,7 +7,6 @@ from torch.distributions import Normal
 
 from fail.model.layers import MLP
 from fail.model.modules import PoseForceEncoder
-from fail.utils.normalizer import LinearNormalizer
 from fail.utils import torch_utils
 from fail.policy.base_policy import BasePolicy
 
@@ -20,7 +19,6 @@ class ExplicitPolicy(BasePolicy):
     def __init__(self, action_dim, seq_len, z_dim, dropout):
         super().__init__(action_dim, seq_len, z_dim)
 
-        self.normalizer = LinearNormalizer()
         self.encoder = PoseForceEncoder(z_dim, seq_len, dropout)
         self.policy = MLP([z_dim, z_dim // 2, action_dim * 2], act_out=False)
 
@@ -51,9 +49,6 @@ class ExplicitPolicy(BasePolicy):
         mean = torch.tanh(mean)
 
         return action, log_prob, mean
-
-    def set_normalizer(self, normalizer: LinearNormalizer):
-        self.normalizer.load_state_dict(normalizer.state_dict())
 
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
