@@ -57,9 +57,9 @@ class ExplicitPolicy(BasePolicy):
 
         policy_obs = nobs.unsqueeze(0).flatten(1, 2)
         # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
-        policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(
-            1, self.seq_len, 1
-        ) - (policy_obs[:, :, :3] + hole_noise)
+        policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
+            policy_obs[:, :, :3] + hole_noise
+        )
         policy_obs = policy_obs.to(device)
 
         with torch.no_grad():
@@ -79,8 +79,7 @@ class ExplicitPolicy(BasePolicy):
         obs = nobs.flatten(1, 2)
         # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
         obs[:, :, :3] = (
-            ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1)
-            - obs[:, :, :3]
+            ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
         )
 
         mean, log_prob, pred_action = self.sample(obs)
