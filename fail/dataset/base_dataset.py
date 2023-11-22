@@ -25,7 +25,7 @@ class BaseDataset(torch.utils.data.Dataset):
         super().__init__()
 
         self.replay_buffer = ReplayBuffer()
-        self.replay_buffer.loadSaveState(pickle.load(open(path, "rb")))
+        self.replay_buffer.load_from_path(path)
 
         val_mask = get_val_mask(
             n_episodes=self.replay_buffer.n_episodes, val_ratio=val_ratio, seed=seed
