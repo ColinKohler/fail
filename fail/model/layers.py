@@ -8,7 +8,7 @@ from escnn import group
 
 
 class MLP(nn.Module):
-    def __init__(self, hiddens, act_out=True):
+    def __init__(self, hiddens, dropout=0., act_out=True):
         super().__init__()
 
         layers = list()
@@ -17,6 +17,7 @@ class MLP(nn.Module):
             is_last_layer = i == len(hiddens) - 2
             if not is_last_layer or act_out:
                 layers.append(nn.LeakyReLU(0.01, inplace=True))
+                layers.append(nn.Dropout(dropout))
         self.mlp = nn.Sequential(*layers)
 
     def forward(self, x):

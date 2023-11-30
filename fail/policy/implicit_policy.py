@@ -31,7 +31,7 @@ class ImplicitPolicy(BasePolicy):
         self.encoder = PoseForceEncoder(z_dim, seq_len, dropout)
         m_dim = 1024
         self.energy_mlp = MLP(
-            [z_dim + action_dim, m_dim, m_dim, m_dim, 1], act_out=False
+            [z_dim + action_dim, m_dim, m_dim, m_dim, 1], dropout=dropout, act_out=False
         )
 
         self.apply(torch_utils.init_weights)
