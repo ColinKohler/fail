@@ -9,10 +9,11 @@ from fail.model.layers import MLP
 from fail.model.modules import PoseForceEncoder
 from fail.utils.normalizer import LinearNormalizer
 from fail.utils import torch_utils
+from fail.utils import harmonics
 from fail.policy.base_policy import BasePolicy
 
 
-class ImplicitPolicy(BasePolicy):
+class HarmonicImplicitPolicy(BasePolicy):
     def __init__(
         self,
         action_dim,
@@ -24,6 +25,7 @@ class ImplicitPolicy(BasePolicy):
         dropout,
     ):
         super().__init__(action_dim, seq_len, z_dim)
+        self.Lmax = 8
         self.num_neg_act_samples = num_neg_act_samples
         self.pred_n_iter = pred_n_iter
         self.pred_n_samples = pred_n_samples
@@ -31,7 +33,7 @@ class ImplicitPolicy(BasePolicy):
         self.encoder = PoseForceEncoder(z_dim, seq_len, dropout)
         m_dim = 1024
         self.energy_mlp = MLP(
-            [z_dim + action_dim, m_dim, m_dim, m_dim, 1], dropout=dropout, act_out=False
+            [z_dim + action_dim-1, m_dim, m_dim, m_dim, 2 * self.Lmax + 1], dropout=dropout, act_out=False
         )
 
         self.apply(torch_utils.init_weights)
@@ -46,18 +48,22 @@ class ImplicitPolicy(BasePolicy):
 
         out = self.energy_mlp(z_a)
 
-        return out.view(B, N)
+        return out.view(B, N, -1)
+
+    def get_energy(self, W, theta):
+        B = harmonics.circular_harmonics(self.Lmax, theta)
+        return torch.bmm(W, B)
 
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
         nobs = self.normalizer["obs"].normalize(np.stack(obs))
-        hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
-        # hole_noise = 0
+        goal_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+        # goal_noise = 0
 
         policy_obs = nobs.unsqueeze(0).flatten(1, 2)
         # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
         policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
-            policy_obs[:, :, :3] + hole_noise
+            policy_obs[:, :, :3] + goal_noise
         )
         policy_obs = policy_obs.to(device)
 
@@ -119,22 +125,23 @@ class ImplicitPolicy(BasePolicy):
         # Sample negatives: (B, train_n_neg, Da)
         action_stats = self.get_action_stats()
         action_dist = torch.distributions.Uniform(
-            low=action_stats["min"], high=action_stats["max"]
+            low=action_stats["min"][0], high=action_stats["max"][0]
         )
         negatives = action_dist.sample((batch_size, self.num_neg_act_samples)).to(
             dtype=naction.dtype
-        )
+        ).view(B, -1, 1)
 
         # Combine pos and neg samples: (B, train_n_neg+1, Da)
-        targets = torch.cat([noisy_actions.unsqueeze(1), negatives], dim=1)
+        targets = torch.cat([noisy_actions[:,0].view(B, 1, 1), negatives], dim=1)
 
         # Randomly permute the positive and negative samples
         permutation = torch.rand(targets.size(0), targets.size(1)).argsort(dim=1)
         targets = targets[torch.arange(targets.size(0)).unsqueeze(-1), permutation]
         ground_truth = (permutation == 0).nonzero()[:, 1].to(naction.device)
 
-        energy = self.forward(obs, targets)
-        # logits = -1.0 * energy
+        breakpoint()
+        W = self.forward(obs, targets)
+        energy = self.get_energy(W, naction[:,-1,-1])
         loss = F.cross_entropy(energy, ground_truth)
 
         return loss

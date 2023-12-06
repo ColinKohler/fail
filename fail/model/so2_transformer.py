@@ -4,10 +4,12 @@ import torch.nn.functional as F
 
 import escnn
 from escnn import gspaces
-from escnn import enn
+from escnn import nn as enn
 from escnn import group
 
 import math
+
+from fail.model.layers import SO2MLP
 
 
 def scaledDotProduct(q, k, v, mask=None):
@@ -41,41 +43,36 @@ class PositionalEncoding(nn.Module):
         return x + self.pe[:, : x.size(1)]
 
 
-class MultiheadAttention(nn.Module):
-    def __init__(self, input_dim, embed_dim, num_heads):
+class SO2MultiheadAttention(nn.Module):
+    def __init__(self, in_type, embed_dim, num_heads):
         super().__init__()
         assert embed_dim % num_heads == 0
 
+        self.in_type = in_type
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
+        self.L = 5
+        self.irreps_dim = 11
 
-        self.qkv_proj = nn.Linear(input_dim, 3 * embed_dim)
-        self.o_proj = nn.Linear(embed_dim, embed_dim)
-
-        self.resetParameters()
-
-    def resetParameters(self):
-        """Original Transformer uses xavier initialization & zero biases."""
-        nn.init.xavier_uniform_(self.qkv_proj.weight)
-        self.qkv_proj.bias.data.fill_(0)
-
-        nn.init.xavier_uniform_(self.o_proj.weight)
-        self.o_proj.bias.data.fill_(0)
+        self.qkv_proj = SO2MLP(in_type, in_type, [3 * embed_dim], [self.L], act_out=False)
+        self.o_proj = SO2MLP(in_type, in_type, [embed_dim], [self.L], act_out=False)
 
     def forward(self, x, mask=None, return_attention=False):
         batch_size, seq_len, embed_dim = x.size()  # [B, S, D]
-        qkv = self.qkv_proj(x)
+        x = self.in_type(x.view(batch_size * seq_len, embed_dim))
+        qkv = self.qkv_proj(x).tensor
 
         # Seperate Q, K, V
-        qkv = qkv.reshape(batch_size, seq_len, self.num_heads, 3 * self.head_dim)
-        qkv = qkv.permute(0, 2, 1, 3)  # [B, H, S, D]
+        qkv = qkv.reshape(batch_size, seq_len, self.num_heads, 3 * self.irreps_dim * self.head_dim)
+        qkv = qkv.permute(0, 2, 1, 3)  # [B, H, S, L*D]
         q, k, v = qkv.chunk(3, dim=-1)
 
         values, attention = scaledDotProduct(q, k, v, mask=mask)
-        values = values.permute(0, 2, 1, 3)  # [B, S, H. D]
-        values = values.reshape(batch_size, seq_len, embed_dim)
-        o = self.o_proj(values)
+        values = values.permute(0, 2, 1, 3)  # [B, S, H, L*D]
+        values = values.reshape(batch_size * seq_len, embed_dim)
+        o = self.o_proj(self.in_type(values))
+        #o = o.tensor.reshape(batch_size, seq_len, -1)
 
         if return_attention:
             return o, attention
@@ -83,41 +80,51 @@ class MultiheadAttention(nn.Module):
             return o
 
 
-class EncoderBlock(nn.Module):
-    def __init__(self, input_dim, num_heads, hidden_dim, dropout=0.0):
+class SO2EncoderBlock(nn.Module):
+    def __init__(self, in_type, in_dim, num_heads, hidden_dim, dropout=0.0):
         super().__init__()
+        self.in_type = in_type
+        self.L = 5
+        self.irreps_dim = 11
 
-        self.attn = MultiheadAttention(input_dim, input_dim, num_heads)
-        self.mlp = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.Dropout(dropout),
-            nn.ReLU(inplace=True),
-            nn.Linear(hidden_dim, input_dim),
-        )
-        self.norm1 = nn.LayerNorm(input_dim)
-        self.norm2 = nn.LayerNorm(input_dim)
-        self.dropout = nn.Dropout(dropout)
+        self.attn = SO2MultiheadAttention(in_type, in_dim, num_heads)
+        self.mlp = SO2MLP(in_type, in_type, [hidden_dim, in_dim], [self.L, self.L], dropout=dropout, act_out=False)
+
+        #self.norm1 = nn.LayerNorm(in_dim)
+        #self.norm2 = nn.LayerNorm(in_dim)
+        self.dropout1 = enn.FieldDropout(self.in_type)
+        self.dropout2 = enn.FieldDropout(self.mlp.out_type, dropout)
 
     def forward(self, x, mask=None):
+        batch_size, seq_len, embed_dim = x.size()  # [B, S, D]
+
         attn_out = self.attn(x, mask=mask)
-        x = x + self.dropout(attn_out)
-        x = self.norm1(x)
-        x = x + self.dropout(self.mlp(x))
-        x = self.norm2(x)
+        x = self.in_type(x.view(batch_size * seq_len, -1)) + self.dropout1(attn_out)
+        #x = self.norm1(x)
+        x = x + self.dropout2(self.mlp(x))
+        #x = self.norm2(x)
 
         return x
 
 
-class TransformerEncoder(nn.Module):
+class SO2TransformerEncoder(nn.Module):
     def __init__(self, num_layers, **block_args):
         super().__init__()
+        self.in_type = block_args['in_type']
+        self.L = 5
+        self.irreps_dim = 11
+
         self.layers = nn.ModuleList(
-            [EncoderBlock(**block_args) for _ in range(num_layers)]
+            [SO2EncoderBlock(**block_args) for _ in range(num_layers)]
         )
 
     def forward(self, x, mask=None):
-        for layer in self.layers:
+        batch_size, seq_len, embed_dim = x.size()  # [B, S, D]
+
+        for i, layer in enumerate(self.layers):
             x = layer(x, mask=mask)
+            if i < len(self.layers) - 1:
+                x = x.tensor.view(batch_size, seq_len, -1)
         return x
 
     def getAttnMaps(self, x, mask=None):
@@ -129,49 +136,54 @@ class TransformerEncoder(nn.Module):
         return attn_maps
 
 
-class Transformer(nn.Module):
+class SO2Transformer(nn.Module):
     def __init__(
         self,
-        input_dim,
+        in_type,
         model_dim,
         out_dim,
         num_heads,
         num_layers,
         dropout=0.0,
-        input_dropout=0.0,
+        in_dropout=0.0,
     ):
         super().__init__()
 
-        self.input_net = nn.Sequential(
-            nn.Dropout(input_dropout), nn.Linear(input_dim, model_dim)
+        self.G = group.so2_group()
+        self.gspace = gspaces.no_base_space(self.G)
+        self.L = 5
+        self.in_type = in_type
+
+        t = self.G.bl_regular_representation(L=self.L)
+        model_type = enn.FieldType(self.gspace, [t] * model_dim)
+        self.input_net = enn.SequentialModule(
+            enn.FieldDropout(in_type, in_dropout), enn.Linear(in_type, model_type)
         )
-        self.pos_enc = PositionalEncoding(d_model=model_dim)
-        self.transformer = TransformerEncoder(
+        #self.pos_enc = PositionalEncoding(d_model=model_dim)
+        self.transformer = SO2TransformerEncoder(
             num_layers=num_layers,
-            input_dim=model_dim,
+            in_type=model_type,
+            in_dim=model_dim,
             hidden_dim=2 * model_dim,
             num_heads=num_heads,
             dropout=dropout,
         )
-        self.out = nn.Sequential(
-            nn.Linear(model_dim, model_dim),
-            nn.LayerNorm(model_dim),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            nn.Linear(model_dim, out_dim),
-        )
+        self.out = SO2MLP(model_type, in_type, [model_dim, out_dim], [self.L, self.L], act_out=False, dropout=dropout)
 
     def forward(self, x, mask=None, add_pos_enc=True):
-        x = self.input_net(x)
-        if add_pos_enc:
-            x = self.pos_enc(x)
+        batch_size, seq_len, in_dim = x.size()  # [B, S, D]
+
+        x = self.in_type(x.view(batch_size * seq_len, -1))
+        x = self.input_net(x).tensor.view(batch_size, seq_len, -1)
+        #if add_pos_enc:
+        #    x = self.pos_enc(x)
         x = self.transformer(x, mask=mask)
         x = self.out(x)
         return x
 
     def getAttnMaps(self, x, mask=None, add_pos_enc=True):
         x = self.input_net(x)
-        if add_pos_enc:
-            x = self.pos_enc(x)
+        #if add_pos_enc:
+        #    x = self.pos_enc(x)
         attn_maps = self.transformer.getAttnMaps(x, mask=mask)
         return attn_maps
