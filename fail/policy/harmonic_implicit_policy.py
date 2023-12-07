@@ -52,7 +52,7 @@ class HarmonicImplicitPolicy(BasePolicy):
 
     def get_energy(self, W, theta):
         B = harmonics.circular_harmonics(self.Lmax, theta)
-        return torch.bmm(W, B)
+        return torch.bmm(W.view(-1, 1, 17), B)
 
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
@@ -125,23 +125,23 @@ class HarmonicImplicitPolicy(BasePolicy):
         # Sample negatives: (B, train_n_neg, Da)
         action_stats = self.get_action_stats()
         action_dist = torch.distributions.Uniform(
-            low=action_stats["min"][0], high=action_stats["max"][0]
+            low=action_stats["min"], high=action_stats["max"]
         )
         negatives = action_dist.sample((batch_size, self.num_neg_act_samples)).to(
             dtype=naction.dtype
-        ).view(B, -1, 1)
+        ).view(B, -1, 2)
 
         # Combine pos and neg samples: (B, train_n_neg+1, Da)
-        targets = torch.cat([noisy_actions[:,0].view(B, 1, 1), negatives], dim=1)
+        targets = torch.cat([noisy_actions.view(B, 1, 2), negatives], dim=1)
 
         # Randomly permute the positive and negative samples
         permutation = torch.rand(targets.size(0), targets.size(1)).argsort(dim=1)
         targets = targets[torch.arange(targets.size(0)).unsqueeze(-1), permutation]
         ground_truth = (permutation == 0).nonzero()[:, 1].to(naction.device)
 
-        breakpoint()
-        W = self.forward(obs, targets)
-        energy = self.get_energy(W, naction[:,-1,-1])
+        W = self.forward(obs, targets[:,:,0].unsqueeze(2))
+        energy = self.get_energy(W.view(-1, W.size(2)), targets[:,:,1].view(-1, 1))
+        energy = energy.view(B, self.num_neg_act_samples+1)
         loss = F.cross_entropy(energy, ground_truth)
 
         return loss
