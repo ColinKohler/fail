@@ -1,13 +1,13 @@
 defaults:
   - _self_
-  - task: peg_insertion
+  - task: block_touching
 
 name: train_implicit_policy
 _target_: fail.workflow.implicit_workflow.ImplicitWorkflow
 
 obs_dim: 0 
-action_dim: 3 
-task_name: 'peg_insertion'
+action_dim: 2
+task_name: 'block_touching'
 exp_name: 'default'
 
 obs_horizon: 2
@@ -19,7 +19,7 @@ policy:
   action_dim: ${action_dim}
   seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
   z_dim: 256
-  num_neg_act_samples: 256
+  num_neg_act_samples: 1024
   pred_n_iter: 3
   pred_n_samples: 2048
   dropout: 0.1
@@ -46,7 +46,7 @@ optimizer:
   weight_decay: 1e-6
 
 training:
-  device: 'cpu'
+  device: 'cuda:0'
   seed: 0
   resume: True
   lr_warmup_steps: 500
@@ -56,7 +56,7 @@ training:
   tqdm_interval_sec: 1.0
 
 logging:
-  project: peg_insertion
+  project: block_touching 
   resume: True
   mode: online
   name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
