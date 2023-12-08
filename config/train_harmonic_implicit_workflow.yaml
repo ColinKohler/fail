@@ -1,13 +1,13 @@
 defaults:
   - _self_
-  - task: block_pushing 
+  - task: block_touching 
 
 name: train_harmonic_implicit_policy
 _target_: fail.workflow.harmonic_implicit_workflow.HarmonicImplicitWorkflow
 
 obs_dim: 0 
 action_dim: 2
-task_name: 'block_pushing'
+task_name: 'block_touching'
 exp_name: 'default'
 
 obs_horizon: 2
@@ -56,7 +56,7 @@ training:
   tqdm_interval_sec: 1.0
 
 logging:
-  project: block_pushing 
+  project: block_touching 
   resume: True
   mode: online
   name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
