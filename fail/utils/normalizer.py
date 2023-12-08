@@ -229,6 +229,7 @@ def _fit(
             input_range = input_max - input_min
             ignore_dim = input_range < range_eps
             input_range[ignore_dim] = output_max - output_min
+            breakpoint()
             scale = (output_max - output_min) / input_range
             offset = output_min - scale * input_min
             offset[ignore_dim] = (output_max + output_min) / 2 - input_min[ignore_dim]

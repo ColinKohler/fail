@@ -57,8 +57,8 @@ class HarmonicImplicitPolicy(BasePolicy):
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
         nobs = self.normalizer["obs"].normalize(np.stack(obs))
-        goal_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
-        # goal_noise = 0
+        #goal_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+        goal_noise = 0
 
         policy_obs = nobs.unsqueeze(0).flatten(1, 2)
         # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
@@ -69,34 +69,56 @@ class HarmonicImplicitPolicy(BasePolicy):
 
         # Sample actions: (1, num_samples, Da)
         action_stats = self.get_action_stats()
-        action_dist = torch.distributions.Uniform(
-            low=action_stats["min"], high=action_stats["max"]
-        )
-        samples = action_dist.sample((1, self.pred_n_samples)).to(
-            dtype=policy_obs.dtype
-        )
+        #action_dist = torch.distributions.Uniform(
+        #    low=action_stats["min"], high=action_stats["max"]
+        #)
+        #samples = action_dist.sample((1, self.pred_n_samples)).to(
+        #    dtype=policy_obs.dtype
+        #)
 
-        zero = torch.tensor(0, device=device)
-        resample_std = torch.tensor(3e-2, device=device)
-        for i in range(self.pred_n_iter):
-            logits = self.forward(policy_obs, samples)
-            # attn = self.encoder.transformer.getAttnMaps(policy_obs)
-            # torch_utils.plotAttnMaps(torch.arange(9).view(1,9), attn)
+        #zero = torch.tensor(0, device=device)
+        #resample_std = torch.tensor(3e-2, device=device)
+        #for i in range(self.pred_n_iter):
+        #    W = self.forward(policy_obs, samples[:,:,0].unsqueeze(2))
+        #    logits = self.get_energy(W.view(-1, W.size(2)), samples[:,:,1].view(-1, 1))
+        #    logits = logits.view(1, self.pred_n_samples)
 
-            prob = torch.softmax(logits, dim=-1)
+        #    # attn = self.encoder.transformer.getAttnMaps(policy_obs)
+        #    # torch_utils.plotAttnMaps(torch.arange(9).view(1,9), attn)
 
-            if i < (self.pred_n_iter - 1):
-                idxs = torch.multinomial(prob, self.pred_n_samples, replacement=True)
-                samples = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs]
-                samples += torch.normal(
-                    zero, resample_std, size=samples.shape, device=device
-                )
+        #    prob = torch.softmax(logits, dim=-1)
+
+        #    if i < (self.pred_n_iter - 1):
+        #        idxs = torch.multinomial(prob, self.pred_n_samples, replacement=True)
+        #        samples = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs]
+        #        samples += torch.normal(
+        #            zero, resample_std, size=samples.shape, device=device
+        #        )
+
+        num_disp = 2
+        num_rot = 36
+        radius = torch.linspace(action_stats['min'][0].item(), action_stats['max'][0].item(), num_disp)
+        radius = radius.view(1,-1,1).repeat(1,1,num_rot,).view(1,-1,1)
+        theta = torch.linspace(action_stats['min'][1].item(), action_stats['max'][1].item(), num_rot)
+        theta = theta.view(1,-1,1).repeat(1,1,num_disp).view(-1,1)
+        W = self.forward(policy_obs, radius)
+        logits = self.get_energy(W.view(-1, W.size(2)), theta)
+        logits = logits.view(1, -1)
+        prob = torch.softmax(logits, dim=-1)
+
 
         idxs = torch.multinomial(prob, num_samples=1, replacement=True)
-        acts_n = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs].squeeze(1)
-        action = self.normalizer["action"].unnormalize(acts_n).cpu().squeeze()
+        #acts_n = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs].squeeze(1)
 
-        return action
+        acts_n = torch.tensor([radius[0, idxs.item()], theta[idxs.item(), 0]])
+        action = self.normalizer["action"].unnormalize(acts_n).cpu().squeeze()
+        #action[0] = 0.02
+        #action[1] = np.pi
+
+        x = action[0] * np.cos(action[1])
+        y = action[0] * np.sin(action[1])
+
+        return [x, y]
 
     def compute_loss(self, batch):
         # Load batch

@@ -65,7 +65,6 @@ class ImplicitWorkflow(BaseWorkflow):
             self.config.training.lr_warmup_steps,
             len(train_dataloader) * self.config.training.num_epochs,
         )
-        criterion = nn.MSELoss()
 
         device = torch.device(self.config.training.device)
         self.model.to(device)

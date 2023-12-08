@@ -20,14 +20,17 @@ import collections
 
 from pydrake.geometry import StartMeshcat
 
-from drake_ws.peg_insertion_envs.robot_insertion_3d_env import createPegInsertionEnv
+#from drake_ws.peg_insertion_envs.robot_insertion_3d_env import createPegInsertionEnv
+from drake_ws.envs.block_pushing_env import createBlockPushingEnv
+from drake_ws.envs.block_touching_env import createBlockTouchingEnv
 from fail.workflow.base_workflow import BaseWorkflow
 from fail.utils import torch_utils
 
 
 def test(checkpoint, num_eps=100, render=False):
     meshcat = StartMeshcat() if render else None
-    env = createPegInsertionEnv(meshcat=meshcat)
+    #env = createPegInsertionEnv(meshcat=meshcat)
+    env = createBlockTouchingEnv(meshcat=meshcat)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     payload = torch.load(open(checkpoint, "rb"), pickle_module=dill)

@@ -73,7 +73,8 @@ class HarmonicDataset(torch.utils.data.Dataset):
         obs = sample[self.obs_key]
         action = sample[self.action_key]
         r = np.sqrt(action[:,0] ** 2 + action[:,1] ** 2)
-        theta = np.arctan(action[:,1] / (action[:,0] + 1e-9))
+        theta = np.arctan2(action[:,1], (action[:,0]))
+        theta = theta + 2 * np.pi if theta < 0 else theta
         data = {
             "obs": obs,  # T, D_o
             "goal": sample["goal"],  # 1, D_g
