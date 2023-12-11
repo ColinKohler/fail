@@ -55,7 +55,7 @@ class SO2MultiheadAttention(nn.Module):
 
         self.L = L
         G = group.so2_group()
-        self.irreps_dim = G.bl_regular_representation(L=5).size
+        self.irreps_dim = G.bl_regular_representation(L=self.L).size
 
         self.qkv_proj = SO2MLP(in_type, in_type, [3 * embed_dim], [self.L], act_out=False)
         self.o_proj = SO2MLP(in_type, in_type, [embed_dim], [self.L], act_out=False)

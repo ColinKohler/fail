@@ -18,21 +18,21 @@ policy:
   _target_: fail.policy.so2_harmonic_implicit_policy.SO2HarmonicImplicitPolicy
   action_dim: ${action_dim}
   seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
-  z_dim: 256
-  num_neg_act_samples: 256
+  z_dim: 64
+  num_neg_act_samples: 64
   pred_n_iter: 3
   pred_n_samples: 2048
   dropout: 0.1
 
 dataloader:
-  batch_size: 256
+  batch_size: 64
   num_workers: 1
   shuffle: True
   pin_memory: True
   persistent_workers: False
 
 val_dataloader:
-  batch_size: 256
+  batch_size: 64
   num_workers: 1
   shuffle: False
   pin_memory: True
@@ -46,7 +46,7 @@ optimizer:
   weight_decay: 1e-6
 
 training:
-  device: 'cpu'
+  device: 'cuda:0'
   seed: 0
   resume: True
   lr_warmup_steps: 500

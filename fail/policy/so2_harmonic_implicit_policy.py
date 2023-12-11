@@ -29,7 +29,7 @@ class SO2HarmonicImplicitPolicy(BasePolicy):
         dropout,
     ):
         super().__init__(action_dim, seq_len, z_dim)
-        self.L = 8
+        self.L = 3
         self.G = group.so2_group()
         self.gspace = gspaces.no_base_space(self.G)
         self.in_type = enn.FieldType(
@@ -41,10 +41,12 @@ class SO2HarmonicImplicitPolicy(BasePolicy):
         self.pred_n_iter = pred_n_iter
         self.pred_n_samples = pred_n_samples
 
-        self.encoder = SO2PoseForceEncoder(self.in_type, 5, z_dim, seq_len, dropout)
+        self.encoder = SO2PoseForceEncoder(self.in_type, self.L, z_dim, seq_len, dropout)
         m_dim = 1024
+        t = self.G.bl_regular_representation(L=self.L)
+        self.mlp_in_type = enn.FieldType(self.gspace, [t] * z_dim + [self.G.irrep(0)])
         self.energy_mlp = SO2MLP(
-            self.encoder.out_type,
+            self.mlp_in_type,
             self.encoder.out_type,
             [z_dim + action_dim-1, m_dim, m_dim, m_dim, 1],
             [self.L, self.L, self.L, self.L, self.L],
@@ -56,19 +58,19 @@ class SO2HarmonicImplicitPolicy(BasePolicy):
     def forward(self, x, a):
         batch_size = x.size(0)
         z = self.encoder(x)
-        breakpoint()
 
-        z_a = torch.cat([z.unsqueeze(1).expand(-1, a.size(1), -1), a], dim=-1)
+        z_a = torch.cat([z.tensor.unsqueeze(1).expand(-1, a.size(1), -1), a], dim=-1)
         B, N, D = z_a.shape
-        z_a.reshape(B * N, D)
+        z_a = z_a.reshape(B * N, D)
 
+        z_a = self.mlp_in_type(z_a)
         out = self.energy_mlp(z_a)
 
-        return out.view(B, N, -1)
+        return out.tensor.view(B, N, -1)
 
     def get_energy(self, W, theta):
         B = harmonics.circular_harmonics(self.L, theta)
-        return torch.bmm(W.view(-1, 1, 17), B)
+        return torch.bmm(W.view(-1, 1, (self.L*2 + 1)), B)
 
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
