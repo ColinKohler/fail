@@ -95,9 +95,10 @@ class HarmonicImplicitPolicy(BasePolicy):
         #            zero, resample_std, size=samples.shape, device=device
         #        )
 
-        num_disp = 2
-        num_rot = 36
-        radius = torch.linspace(action_stats['min'][0].item(), action_stats['max'][0].item(), num_disp)
+        num_disp = 1
+        num_rot = 360
+        #radius = torch.linspace(action_stats['min'][0].item(), action_stats['max'][0].item(), num_disp)
+        radius = torch.tensor([1]).view(1,1).float()
         radius = radius.view(1,-1,1).repeat(1,1,num_rot,).view(1,-1,1)
         theta = torch.linspace(action_stats['min'][1].item(), action_stats['max'][1].item(), num_rot)
         theta = theta.view(1,-1,1).repeat(1,1,num_disp).view(-1,1)
@@ -110,6 +111,9 @@ class HarmonicImplicitPolicy(BasePolicy):
         idxs = torch.multinomial(prob, num_samples=1, replacement=True)
         #acts_n = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs].squeeze(1)
 
+        print(idxs)
+        idxs = torch.argmax(prob)
+        print(idxs)
         acts_n = torch.tensor([radius[0, idxs.item()], theta[idxs.item(), 0]])
         action = self.normalizer["action"].unnormalize(acts_n).cpu().squeeze()
         #action[0] = 0.02
@@ -117,6 +121,11 @@ class HarmonicImplicitPolicy(BasePolicy):
 
         x = action[0] * np.cos(action[1])
         y = action[0] * np.sin(action[1])
+
+        print(acts_n)
+        print(action)
+        print([x.item(), y.item()])
+        harmonics.plot_energy_circle(prob[0,:].detach().numpy())
 
         return [x, y]
 

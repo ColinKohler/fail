@@ -15,9 +15,9 @@ def spherical_harmonics(L, theta):
 
 def plot_energy_circle(E):
   fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-  ax.plot(np.linspace(0, 2*np.pi, 36), E)
-  ax.set_rmax(np.max(E) + 0.2)
-  ax.set_rticks(np.round(np.linspace(np.min(E),np.max(E), 5), 1))
+  ax.plot(np.linspace(0, 2*np.pi, 360), E)
+  ax.set_rmax(np.max(E))
+  ax.set_rticks(np.round(np.linspace(np.min(E), np.max(E), 5), 3))
   ax.grid(True)
 
   ax.set_title("Energy", va='bottom')
