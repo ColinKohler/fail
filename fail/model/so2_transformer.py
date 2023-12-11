@@ -44,7 +44,7 @@ class PositionalEncoding(nn.Module):
 
 
 class SO2MultiheadAttention(nn.Module):
-    def __init__(self, in_type, embed_dim, num_heads):
+    def __init__(self, in_type, L, embed_dim, num_heads):
         super().__init__()
         assert embed_dim % num_heads == 0
 
@@ -52,8 +52,10 @@ class SO2MultiheadAttention(nn.Module):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
-        self.L = 5
-        self.irreps_dim = 11
+
+        self.L = L
+        G = group.so2_group()
+        self.irreps_dim = G.bl_regular_representation(L=5).size
 
         self.qkv_proj = SO2MLP(in_type, in_type, [3 * embed_dim], [self.L], act_out=False)
         self.o_proj = SO2MLP(in_type, in_type, [embed_dim], [self.L], act_out=False)
@@ -81,13 +83,12 @@ class SO2MultiheadAttention(nn.Module):
 
 
 class SO2EncoderBlock(nn.Module):
-    def __init__(self, in_type, in_dim, num_heads, hidden_dim, dropout=0.0):
+    def __init__(self, in_type, L, in_dim, num_heads, hidden_dim, dropout=0.0):
         super().__init__()
         self.in_type = in_type
-        self.L = 5
-        self.irreps_dim = 11
+        self.L = L
 
-        self.attn = SO2MultiheadAttention(in_type, in_dim, num_heads)
+        self.attn = SO2MultiheadAttention(in_type, L, in_dim, num_heads)
         self.mlp = SO2MLP(in_type, in_type, [hidden_dim, in_dim], [self.L, self.L], dropout=dropout, act_out=False)
 
         #self.norm1 = nn.LayerNorm(in_dim)
@@ -111,8 +112,6 @@ class SO2TransformerEncoder(nn.Module):
     def __init__(self, num_layers, **block_args):
         super().__init__()
         self.in_type = block_args['in_type']
-        self.L = 5
-        self.irreps_dim = 11
 
         self.layers = nn.ModuleList(
             [SO2EncoderBlock(**block_args) for _ in range(num_layers)]
@@ -140,35 +139,39 @@ class SO2Transformer(nn.Module):
     def __init__(
         self,
         in_type,
+        L,
         model_dim,
         out_dim,
         num_heads,
         num_layers,
         dropout=0.0,
-        in_dropout=0.0,
+        input_dropout=0.0,
     ):
         super().__init__()
 
         self.G = group.so2_group()
         self.gspace = gspaces.no_base_space(self.G)
-        self.L = 5
+        self.L = L
         self.in_type = in_type
 
         t = self.G.bl_regular_representation(L=self.L)
         model_type = enn.FieldType(self.gspace, [t] * model_dim)
+        self.out_type = model_type
         self.input_net = enn.SequentialModule(
-            enn.FieldDropout(in_type, in_dropout), enn.Linear(in_type, model_type)
+            enn.FieldDropout(in_type, input_dropout),
+            enn.Linear(in_type, model_type)
         )
         #self.pos_enc = PositionalEncoding(d_model=model_dim)
         self.transformer = SO2TransformerEncoder(
             num_layers=num_layers,
             in_type=model_type,
+            L=L,
             in_dim=model_dim,
             hidden_dim=2 * model_dim,
             num_heads=num_heads,
             dropout=dropout,
         )
-        self.out = SO2MLP(model_type, in_type, [model_dim, out_dim], [self.L, self.L], act_out=False, dropout=dropout)
+        self.out = SO2MLP(model_type, self.out_type, [model_dim, out_dim], [self.L, self.L], act_out=False, dropout=dropout)
 
     def forward(self, x, mask=None, add_pos_enc=True):
         batch_size, seq_len, in_dim = x.size()  # [B, S, D]
