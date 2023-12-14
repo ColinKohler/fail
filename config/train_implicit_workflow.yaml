@@ -14,6 +14,15 @@ obs_horizon: 2
 obs_key_points: 10
 n_action_steps: 1
 
+encoder:
+  _target_: fail.model.modules.PoseForceEncoder
+  robot_state_dim: 9
+  model_dim: 256
+  trans_out_dim: 32
+  z_dim: 256
+  seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
+  dropout: 0.1
+
 policy:
   _target_: fail.policy.implicit_policy.ImplicitPolicy
   action_dim: ${action_dim}
@@ -46,7 +55,7 @@ optimizer:
   weight_decay: 1e-6
 
 training:
-  device: 'cuda:0'
+  device: 'cpu'
   seed: 0
   resume: True
   lr_warmup_steps: 500

@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 
 from fail.model.layers import MLP
-from fail.model.modules import PoseForceEncoder
 from fail.utils.normalizer import LinearNormalizer
 from fail.utils import torch_utils
 from fail.policy.base_policy import BasePolicy
@@ -22,13 +21,14 @@ class ImplicitPolicy(BasePolicy):
         seq_len,
         z_dim,
         dropout,
+        encoder
     ):
         super().__init__(action_dim, seq_len, z_dim)
         self.num_neg_act_samples = num_neg_act_samples
         self.pred_n_iter = pred_n_iter
         self.pred_n_samples = pred_n_samples
 
-        self.encoder = PoseForceEncoder(z_dim, seq_len, dropout)
+        self.encoder = encoder
         m_dim = 1024
         self.energy_mlp = MLP(
             [z_dim + action_dim, m_dim, m_dim, m_dim, 1], dropout=dropout, act_out=False

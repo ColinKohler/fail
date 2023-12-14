@@ -14,23 +14,33 @@ from fail.utils.normalizer import LinearNormalizer
 
 
 class PoseForceEncoder(nn.Module):
-    def __init__(self, z_dim=64, seq_len=20, dropout=0.1):
+    def __init__(
+        self,
+            robot_state_dim: int,
+            model_dim: int=256,
+            trans_out_dim: int=32,
+            z_dim: int=64,
+            seq_len: int=20,
+            dropout: float=0.1
+    ):
         super().__init__()
-        trans_out_dim = 32
+        self.robot_state_embedding = nn.Sequential(
+            nn.Dropout(dropout), nn.Linear(robot_state_dim, model_dim)
+        )
+
         self.transformer = Transformer(
-            input_dim=9,
-            model_dim=256,
+            model_dim=model_dim,
             out_dim=trans_out_dim,
             num_heads=8,
             num_layers=4,
             dropout=dropout,
-            input_dropout=dropout,
         )
         self.out = nn.Linear(seq_len * trans_out_dim, z_dim)
 
-    def forward(self, x):
-        batch_size = x.size(0)
-        x = self.transformer(x)
+    def forward(self, robot_state):
+        batch_size = robot_state.size(0)
+        robot_embed = self.robot_state_embedding(robot_state)
+        x = self.transformer(robot_embed)
         return self.out(x.view(batch_size, -1))
 
 
