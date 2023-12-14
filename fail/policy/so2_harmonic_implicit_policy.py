@@ -129,9 +129,9 @@ class SO2HarmonicImplicitPolicy(BasePolicy):
         idxs = torch.multinomial(prob, num_samples=1, replacement=True)
         #acts_n = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs].squeeze(1)
 
-        print(idxs)
+        #print(idxs)
         idxs = torch.argmax(prob)
-        print(idxs)
+        #print(idxs)
         acts_n = torch.tensor([radius[0, idxs.item()], theta[idxs.item(), 0]])
         action = self.normalizer["action"].unnormalize(acts_n).cpu().squeeze()
         #action[0] = 0.02
@@ -140,9 +140,9 @@ class SO2HarmonicImplicitPolicy(BasePolicy):
         x = action[0] * np.cos(action[1])
         y = action[0] * np.sin(action[1])
 
-        print(acts_n)
-        print(action)
-        print([x.item(), y.item()])
+        #print(acts_n)
+        #print(action)
+        #print([x.item(), y.item()])
         harmonics.plot_energy_circle(prob[0,:].detach().numpy())
 
         return [x, y]

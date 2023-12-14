@@ -24,13 +24,14 @@ class MLP(nn.Module):
         return self.mlp(x)
 
 
-class CNN(nn.Module):
+class ResNet(nn.Module):
     def __init__(self, hiddens):
         super().__init__()
 
         layers = list()
         for h, h_ in zip(hiddens, hiddens[1:]):
             layers.append(nn.Conv2d(h, h_, kernel_size=3, padding=1, stride=2))
+            layers.appen(nn.MaxPool2d(2))
             layers.append(nn.ReLU(inplace=True))
         self.cnn = nn.Sequential(*layers)
 

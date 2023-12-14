@@ -11,6 +11,8 @@ import numpy as np
 import numpy.random as npr
 import torch
 from tqdm import tqdm
+import matplotlib
+matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 import pickle
 import dill

@@ -6,8 +6,9 @@ from escnn import gspaces
 from escnn import nn as enn
 from escnn import group
 
-from fail.model.layers import SO2MLP, MLP, CNN
-from fail.model.transformer import Transformer
+from fail.model.layers import SO2MLP, MLP, ResNet
+#from fail.model.transformer import Transformer
+from fail.model.general_transformer import Transformer
 from fail.model.so2_transformer import SO2Transformer
 from fail.utils.normalizer import LinearNormalizer
 
@@ -30,6 +31,78 @@ class PoseForceEncoder(nn.Module):
     def forward(self, x):
         batch_size = x.size(0)
         x = self.transformer(x)
+        return self.out(x.view(batch_size, -1))
+
+
+class RobotStateObjectPoseEncoder(nn.Module):
+    def __init__(
+            self,
+            robot_state_dim: int,
+            object_state_dim: int,
+            model_dim: int=256,
+            trans_out_dim: int=32,
+            z_dim: int=64,
+            seq_len: int=20,
+            dropout: float=0.1
+    ):
+        super().__init__()
+        self.robot_state_embedding = nn.Sequential(
+            nn.Dropout(dropout), nn.Linear(robot_state_dim, model_dim)
+        )
+        self.object_state_embedding = nn.Sequential(
+            nn.Dropout(dropout), nn.Linear(object_state_dim, model_dim)
+        )
+        self.transformer = Transformer(
+            model_dim=model_dim,
+            out_dim=trans_out_dim,
+            num_heads=8,
+            num_layers=4,
+            dropout=dropout
+        )
+        self.out = nn.Linear(seq_len * trans_out_dim, z_dim)
+
+    def forward(self, robot_state, object_state) -> torch.Tensor:
+        batch_size = robot_state.size(0)
+        robot_embed = self.robot_state_embedding(robot_state)
+        object_embed = self.object_state_embedding(object_state)
+
+        x = self.transformer(robot_embed, key=object_embed)
+        return self.out(x.view(batch_size, -1))
+
+
+class RobotStateVisionEncoder(nn.Module):
+    def __init__(
+            self,
+            robot_state_dim: int,
+            vision_dim: int,
+            model_dim: int=256,
+            trans_out_dim: int=32,
+            z_dim: int=64,
+            seq_len: int=20,
+            dropout: float=0.1
+    ):
+        super().__init__()
+        self.robot_state_embedding = nn.Sequential(
+            nn.Dropout(dropout), nn.Linear(robot_state_dim, model_dim)
+        )
+        self.vision_embedding = nn.Sequential(
+            nn.Dropout(dropout), ResNet([vision_dim, 8, 16, 32, 64, model_dim])
+        )
+        self.transformer = Transformer(
+            model_dim=model_dim,
+            out_dim=trans_out_dim,
+            num_heads=8,
+            num_layers=4,
+            dropout=dropout
+        )
+        self.out = nn.Linear(seq_len * trans_out_dim, z_dim)
+
+    def forward(self, robot_state: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
+        batch_size = robot_state.size(0)
+        robot_embed = self.robot_state_embedding(robot_state)
+        vision_embed = self.vision_embedding(vision).view(batch_size, -1)
+
+        x = self.transformer(robot_embed, key=vision_embed)
         return self.out(x.view(batch_size, -1))
 
 
