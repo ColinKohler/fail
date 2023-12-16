@@ -69,8 +69,8 @@ class MultiheadAttention(nn.Module):
         # Seperate Q, K, V
         qv = qv.reshape(batch_size, seq_len, self.num_heads, 2 * self.head_dim)
         qv = qv.permute(0, 2, 1, 3)  # [B, H, S, D]
-        q, v = qkv.chunk(2, dim=-1)
-        k = k.resahape(batch_size, seq_len, self.num_heads, self.head_dim)
+        q, v = qv.chunk(2, dim=-1)
+        k = k.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
         k = k.permute(0, 2, 1, 3) # [B, H, S, D]
 
         values, attention = scaledDotProduct(q, k, v, mask=mask)

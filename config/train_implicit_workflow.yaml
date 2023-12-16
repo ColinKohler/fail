@@ -15,8 +15,9 @@ obs_key_points: 10
 n_action_steps: 1
 
 encoder:
-  _target_: fail.model.modules.PoseForceEncoder
+  _target_: fail.model.modules.RobotStateObjectPoseEncoder
   robot_state_dim: 9
+  object_state_dim: 3
   model_dim: 256
   trans_out_dim: 32
   z_dim: 256

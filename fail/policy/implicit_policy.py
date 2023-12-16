@@ -36,9 +36,9 @@ class ImplicitPolicy(BasePolicy):
 
         self.apply(torch_utils.init_weights)
 
-    def forward(self, x, a):
+    def forward(self, x, y, a):
         batch_size = x.size(0)
-        z = self.encoder(x)
+        z = self.encoder(x, y)
 
         z_a = torch.cat([z.unsqueeze(1).expand(-1, a.size(1), -1), a], dim=-1)
         B, N, D = z_a.shape
@@ -100,10 +100,11 @@ class ImplicitPolicy(BasePolicy):
 
         B = nobs.shape[0]
         obs = nobs.flatten(1, 2)
+        obj_state = ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1)
         # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
-        obs[:, :, :3] = (
-            ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
-        )
+        #obs[:, :, :3] = (
+        #    ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
+        #)
 
         # Add noise to positive samples
         batch_size = naction.size(0)
@@ -133,7 +134,7 @@ class ImplicitPolicy(BasePolicy):
         targets = targets[torch.arange(targets.size(0)).unsqueeze(-1), permutation]
         ground_truth = (permutation == 0).nonzero()[:, 1].to(naction.device)
 
-        energy = self.forward(obs, targets)
+        energy = self.forward(obs, obj_state, targets)
         # logits = -1.0 * energy
         loss = F.cross_entropy(energy, ground_truth)
 
