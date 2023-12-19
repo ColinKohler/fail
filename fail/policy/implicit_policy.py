@@ -51,14 +51,18 @@ class ImplicitPolicy(BasePolicy):
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
         nobs = self.normalizer["obs"].normalize(np.stack(obs))
-        hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+        #hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
         # hole_noise = 0
 
         policy_obs = nobs.unsqueeze(0).flatten(1, 2)
+        #obj_state = ngoal.view(1,1,3).repeat(1, self.seq_len, 1)
         # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
-        policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
-            policy_obs[:, :, :3] + hole_noise
-        )
+        #policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
+        #    policy_obs[:, :, :3] + hole_noise
+        #)
+        obj_state = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
+            policy_obs[:, :, :3]# + hole_noise
+        ).to(device)
         policy_obs = policy_obs.to(device)
 
         # Sample actions: (1, num_samples, Da)
@@ -73,7 +77,7 @@ class ImplicitPolicy(BasePolicy):
         zero = torch.tensor(0, device=device)
         resample_std = torch.tensor(3e-2, device=device)
         for i in range(self.pred_n_iter):
-            logits = self.forward(policy_obs, samples)
+            logits = self.forward(policy_obs, obj_state, samples)
             # attn = self.encoder.transformer.getAttnMaps(policy_obs)
             # torch_utils.plotAttnMaps(torch.arange(9).view(1,9), attn)
 
