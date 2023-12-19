@@ -1,19 +1,19 @@
 defaults:
   - _self_
-  - task: block_touching
+  - task: peg_insertion 
 
 name: train_implicit_policy
 _target_: fail.workflow.implicit_workflow.ImplicitWorkflow
 
 obs_dim: 0 
-action_dim: 2
-task_name: 'block_touching'
+action_dim: 3
+task_name: 'peg_insertion'
 exp_name: 'default'
 
 obs_horizon: 2
 obs_key_points: 10
 n_action_steps: 1
-z_dim: 64
+z_dim: 256
 
 encoder:
   _target_: fail.model.modules.RobotStateObjectPoseEncoder
@@ -21,6 +21,8 @@ encoder:
   object_state_dim: 3
   model_dim: 64
   trans_out_dim: 32
+  trans_layers: 4
+  trans_heads: 8
   z_dim: ${z_dim}
   seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
   dropout: 0.1
@@ -36,14 +38,14 @@ policy:
   dropout: 0.1
 
 dataloader:
-  batch_size: 256
+  batch_size: 128
   num_workers: 1
   shuffle: True
   pin_memory: True
   persistent_workers: False
 
 val_dataloader:
-  batch_size: 256
+  batch_size: 128
   num_workers: 1
   shuffle: False
   pin_memory: True
@@ -57,7 +59,7 @@ optimizer:
   weight_decay: 1e-6
 
 training:
-  device: 'cuda:0'
+  device: 'cuda:1'
   seed: 0
   resume: True
   lr_warmup_steps: 500
@@ -67,7 +69,7 @@ training:
   tqdm_interval_sec: 1.0
 
 logging:
-  project: block_touching 
+  project: peg_insertion 
   resume: True
   mode: online
   name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}

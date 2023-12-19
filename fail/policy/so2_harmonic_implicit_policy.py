@@ -27,6 +27,7 @@ class SO2HarmonicImplicitPolicy(BasePolicy):
         seq_len,
         z_dim,
         dropout,
+        encoder
     ):
         super().__init__(action_dim, seq_len, z_dim)
         self.L = 3
@@ -41,8 +42,9 @@ class SO2HarmonicImplicitPolicy(BasePolicy):
         self.pred_n_iter = pred_n_iter
         self.pred_n_samples = pred_n_samples
 
-        self.encoder = SO2PoseForceEncoder(self.in_type, self.L, z_dim, seq_len, dropout)
-        m_dim = 1024
+        self.encoder = encoder
+        #self.encoder = SO2PoseForceEncoder(self.in_type, self.L, z_dim, seq_len, dropout)
+        m_dim = z_dim * 2
         t = self.G.bl_regular_representation(L=self.L)
         self.mlp_in_type = enn.FieldType(self.gspace, [t] * z_dim + [self.G.irrep(0)])
         self.energy_mlp = SO2MLP(

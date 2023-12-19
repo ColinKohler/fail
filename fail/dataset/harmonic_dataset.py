@@ -15,7 +15,7 @@ class HarmonicDataset(BaseDataset):
         val_ratio=0.0,
     ):
         super().__init__(
-            path
+            path,
             horizon=horizon,
             pad_before=pad_before,
             pad_after=pad_after,

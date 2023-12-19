@@ -13,6 +13,19 @@ exp_name: 'default'
 obs_horizon: 2
 obs_key_points: 10
 n_action_steps: 1
+z_dim: 256
+
+encoder:
+  _target_: fail.model.modules.SO2RobotStateObjectPoseEncoder
+  robot_state_dim: 9
+  object_state_dim: 3
+  model_dim: 64
+  trans_out_dim: 32
+  trans_layers: 4
+  trans_heads: 8
+  z_dim: ${z_dim}
+  seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
+  dropout: 0.1
 
 policy:
   _target_: fail.policy.so2_harmonic_implicit_policy.SO2HarmonicImplicitPolicy

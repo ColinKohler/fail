@@ -6,7 +6,6 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 
 from fail.model.layers import MLP
-from fail.model.modules import PoseForceEncoder
 from fail.utils.normalizer import LinearNormalizer
 from fail.utils import torch_utils
 from fail.utils import harmonics
@@ -21,26 +20,28 @@ class HarmonicImplicitPolicy(BasePolicy):
         pred_n_iter,
         pred_n_samples,
         seq_len,
+        lmax,
         z_dim,
         dropout,
+        encoder
     ):
         super().__init__(action_dim, seq_len, z_dim)
-        self.Lmax = 8
+        self.Lmax = 3
         self.num_neg_act_samples = num_neg_act_samples
         self.pred_n_iter = pred_n_iter
         self.pred_n_samples = pred_n_samples
 
-        self.encoder = PoseForceEncoder(z_dim, seq_len, dropout)
-        m_dim = 1024
+        self.encoder = encoder
+        m_dim = z_dim * 2
         self.energy_mlp = MLP(
             [z_dim + action_dim-1, m_dim, m_dim, m_dim, 2 * self.Lmax + 1], dropout=dropout, act_out=False
         )
 
         self.apply(torch_utils.init_weights)
 
-    def forward(self, x, a):
+    def forward(self, x, y, a):
         batch_size = x.size(0)
-        z = self.encoder(x)
+        z = self.encoder(x, y)
 
         z_a = torch.cat([z.unsqueeze(1).expand(-1, a.size(1), -1), a], dim=-1)
         B, N, D = z_a.shape
@@ -52,7 +53,7 @@ class HarmonicImplicitPolicy(BasePolicy):
 
     def get_energy(self, W, theta):
         B = harmonics.circular_harmonics(self.Lmax, theta)
-        return torch.bmm(W.view(-1, 1, 17), B)
+        return torch.bmm(W.view(-1, 1, self.Lmax*2+1), B)
 
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
@@ -138,9 +139,7 @@ class HarmonicImplicitPolicy(BasePolicy):
         B = nobs.shape[0]
         obs = nobs.flatten(1, 2)
         # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
-        obs[:, :, :3] = (
-            ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
-        )
+        obj_state = (ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3])
 
         # Add noise to positive samples
         batch_size = naction.size(0)
@@ -170,7 +169,7 @@ class HarmonicImplicitPolicy(BasePolicy):
         targets = targets[torch.arange(targets.size(0)).unsqueeze(-1), permutation]
         ground_truth = (permutation == 0).nonzero()[:, 1].to(naction.device)
 
-        W = self.forward(obs, targets[:,:,0].unsqueeze(2))
+        W = self.forward(obs, obj_state, targets[:,:,0].unsqueeze(2))
         energy = self.get_energy(W.view(-1, W.size(2)), targets[:,:,1].view(-1, 1))
         energy = energy.view(B, self.num_neg_act_samples+1)
         loss = F.cross_entropy(energy, ground_truth)
