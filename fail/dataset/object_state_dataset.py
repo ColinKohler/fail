@@ -28,9 +28,10 @@ class ObjectPoseDataset(BaseDataset):
     def _sample_to_data(self, sample):
         obs = sample[self.obs_key]
         action = sample[self.action_key]
+
         data = {
-            "obs": obs,  # T, D_o
-            "objects": sample["objects"],  # 1, D_g
+            "robot_state": obs,  # T, D_r
+            "object_state": sample["objects"],  # 1, D_o
             "action": sample[self.action_key],  # T, D_a
         }
         return data

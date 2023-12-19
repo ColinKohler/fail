@@ -26,7 +26,7 @@ class HarmonicImplicitPolicy(BasePolicy):
         encoder
     ):
         super().__init__(action_dim, seq_len, z_dim)
-        self.Lmax = 3
+        self.Lmax = lmax
         self.num_neg_act_samples = num_neg_act_samples
         self.pred_n_iter = pred_n_iter
         self.pred_n_samples = pred_n_samples
@@ -34,7 +34,7 @@ class HarmonicImplicitPolicy(BasePolicy):
         self.encoder = encoder
         m_dim = z_dim * 2
         self.energy_mlp = MLP(
-            [z_dim + action_dim-1, m_dim, m_dim, m_dim, 2 * self.Lmax + 1], dropout=dropout, act_out=False
+            [z_dim + 1, m_dim, m_dim, m_dim, 2 * self.Lmax + 1], dropout=dropout, act_out=False
         )
 
         self.apply(torch_utils.init_weights)

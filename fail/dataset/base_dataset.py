@@ -13,14 +13,15 @@ from fail.utils.sampler import SequenceSampler, get_val_mask
 class BaseDataset(torch.utils.data.Dataset):
     def __init__(
         self,
-        path,
-        horizon=1,
-        pad_before=0,
-        pad_after=0,
-        obs_key="state",
-        action_key="action",
-        seed=0,
-        val_ratio=0.0,
+        path: str,
+        horizon: int=1,
+        pad_before: int=0,
+        pad_after: int=0,
+        obs_key: str="state",
+        action_key: str="action",
+        harmonic_action: bool=False,
+        seed: int=0,
+        val_ratio: float=0.0,
     ):
         super().__init__()
 
@@ -45,6 +46,7 @@ class BaseDataset(torch.utils.data.Dataset):
         self.pad_after = pad_after
         self.obs_key = obs_key
         self.action_key = action_key
+        self.harmonic_action=harmonic_action
 
         self.normalizer = self.get_normalizer()
 
@@ -69,18 +71,12 @@ class BaseDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return len(self.sampler)
 
-    def _sample_to_data(self, sample):
-        obs = sample[self.obs_key]
-        data = {
-            "obs": obs,  # T, D_o
-            "goal": sample["goal"],  # 1, D_g
-            "action": sample[self.action_key],  # T, D_a
-        }
-        return data
-
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         sample = self.sampler.sample_sequence(idx)
         data = self._sample_to_data(sample)
+
+        if self.harmonic_action:
+            data['action'] = harmonics.convert_action_to_harmonics(data['action'])
 
         torch_data = torch_utils.dict_apply(data, torch.from_numpy)
         return self.normalizer.normalize(torch_data)
