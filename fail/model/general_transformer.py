@@ -45,7 +45,8 @@ class MultiheadAttention(nn.Module):
         self.head_dim = embed_dim // num_heads
 
         self.k_proj = nn.Linear(input_dim, embed_dim)
-        self.qv_proj = nn.Linear(input_dim, 2 * embed_dim)
+        self.q_proj = nn.Linear(input_dim, embed_dim)
+        self.v_proj = nn.Linear(input_dim, embed_dim)
         self.o_proj = nn.Linear(embed_dim, embed_dim)
 
         self.resetParameters()
@@ -55,23 +56,29 @@ class MultiheadAttention(nn.Module):
         nn.init.xavier_uniform_(self.k_proj.weight)
         self.k_proj.bias.data.fill_(0)
 
-        nn.init.xavier_uniform_(self.qv_proj.weight)
-        self.qv_proj.bias.data.fill_(0)
+        nn.init.xavier_uniform_(self.q_proj.weight)
+        self.q_proj.bias.data.fill_(0)
+
+        nn.init.xavier_uniform_(self.v_proj.weight)
+        self.v_proj.bias.data.fill_(0)
 
         nn.init.xavier_uniform_(self.o_proj.weight)
         self.o_proj.bias.data.fill_(0)
 
     def forward(self, x, key=None, mask=None, return_attention=False):
         batch_size, seq_len, embed_dim = x.size()  # [B, S, D]
-        qv = self.qv_proj(x)
-        k = self.k_proj(key) if key is not None else self.k_proj(x)
+
+        v = self.v_proj(x)
+        k = self.k_proj(x)
+        q = self.q_proj(key) if key is not None else self.q_proj(x)
 
         # Seperate Q, K, V
-        qv = qv.reshape(batch_size, seq_len, self.num_heads, 2 * self.head_dim)
-        qv = qv.permute(0, 2, 1, 3)  # [B, H, S, D]
-        q, v = qv.chunk(2, dim=-1)
+        v = v.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
+        v = v.permute(0, 2, 1, 3)  # [B, H, S, D]
         k = k.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
         k = k.permute(0, 2, 1, 3) # [B, H, S, D]
+        q = q.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
+        q = q.permute(0, 2, 1, 3)  # [B, H, S, D]
 
         values, attention = scaledDotProduct(q, k, v, mask=mask)
         values = values.permute(0, 2, 1, 3)  # [B, S, H. D]

@@ -13,14 +13,15 @@ exp_name: 'default'
 obs_horizon: 2
 obs_key_points: 10
 n_action_steps: 1
+z_dim: 64
 
 encoder:
   _target_: fail.model.modules.RobotStateObjectPoseEncoder
   robot_state_dim: 9
   object_state_dim: 3
-  model_dim: 256
+  model_dim: 64
   trans_out_dim: 32
-  z_dim: 256
+  z_dim: ${z_dim}
   seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
   dropout: 0.1
 
@@ -28,7 +29,7 @@ policy:
   _target_: fail.policy.implicit_policy.ImplicitPolicy
   action_dim: ${action_dim}
   seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
-  z_dim: 256
+  z_dim: ${z_dim}
   num_neg_act_samples: 1024
   pred_n_iter: 3
   pred_n_samples: 2048
@@ -56,7 +57,7 @@ optimizer:
   weight_decay: 1e-6
 
 training:
-  device: 'cpu'
+  device: 'cuda:0'
   seed: 0
   resume: True
   lr_warmup_steps: 500

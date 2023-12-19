@@ -29,7 +29,7 @@ class ImplicitPolicy(BasePolicy):
         self.pred_n_samples = pred_n_samples
 
         self.encoder = encoder
-        m_dim = 1024
+        m_dim = z_dim * 2
         self.energy_mlp = MLP(
             [z_dim + action_dim, m_dim, m_dim, m_dim, 1], dropout=dropout, act_out=False
         )
@@ -104,11 +104,12 @@ class ImplicitPolicy(BasePolicy):
 
         B = nobs.shape[0]
         obs = nobs.flatten(1, 2)
-        obj_state = ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1)
+        #obj_state = ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1)
         # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
         #obs[:, :, :3] = (
         #    ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
         #)
+        obj_state = (ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3])
 
         # Add noise to positive samples
         batch_size = naction.size(0)
