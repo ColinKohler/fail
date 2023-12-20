@@ -8,7 +8,7 @@ from escnn import group
 
 
 class MLP(nn.Module):
-    def __init__(self, hiddens, dropout=0., act_out=True):
+    def __init__(self, hiddens, dropout=0.0, act_out=True):
         super().__init__()
 
         layers = list()
@@ -40,7 +40,9 @@ class ResNet(nn.Module):
 
 
 class SO2MLP(nn.Module):
-    def __init__(self, in_type, out_type, channels, lmaxs, N=32, dropout=0., act_out=True):
+    def __init__(
+        self, in_type, out_type, channels, lmaxs, N=32, dropout=0.0, act_out=True
+    ):
         super().__init__()
 
         self.G = group.so2_group()

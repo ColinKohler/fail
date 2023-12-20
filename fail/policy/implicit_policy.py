@@ -21,7 +21,7 @@ class ImplicitPolicy(BasePolicy):
         seq_len,
         z_dim,
         dropout,
-        encoder
+        encoder,
     ):
         super().__init__(action_dim, seq_len, z_dim)
         self.num_neg_act_samples = num_neg_act_samples
@@ -55,11 +55,11 @@ class ImplicitPolicy(BasePolicy):
         # hole_noise = 0
 
         policy_obs = nobs.unsqueeze(0).flatten(1, 2)
-        #obj_state = ngoal.view(1,1,3).repeat(1, self.seq_len, 1)
+        # obj_state = ngoal.view(1,1,3).repeat(1, self.seq_len, 1)
         # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
-        #policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
+        # policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
         #    policy_obs[:, :, :3] + hole_noise
-        #)
+        # )
         obj_state = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
             policy_obs[:, :, :3] + torch.tensor(hole_noise).float()
         ).to(device)
@@ -104,12 +104,14 @@ class ImplicitPolicy(BasePolicy):
 
         B = nobs.shape[0]
         obs = nobs.flatten(1, 2)
-        #obj_state = ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1)
+        # obj_state = ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1)
         # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
-        #obs[:, :, :3] = (
+        # obs[:, :, :3] = (
         #    ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
-        #)
-        obj_state = (ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3])
+        # )
+        obj_state = (
+            ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
+        )
 
         # Add noise to positive samples
         batch_size = naction.size(0)

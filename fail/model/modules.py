@@ -7,7 +7,8 @@ from escnn import nn as enn
 from escnn import group
 
 from fail.model.layers import SO2MLP, MLP, ResNet
-#from fail.model.transformer import Transformer
+
+# from fail.model.transformer import Transformer
 from fail.model.general_transformer import Transformer
 from fail.model.so2_transformer import SO2Transformer
 from fail.utils.normalizer import LinearNormalizer
@@ -17,11 +18,11 @@ class PoseForceEncoder(nn.Module):
     def __init__(
         self,
         robot_state_dim: int,
-        model_dim: int=256,
-        trans_out_dim: int=32,
-        z_dim: int=64,
-        seq_len: int=20,
-        dropout: float=0.1
+        model_dim: int = 256,
+        trans_out_dim: int = 32,
+        z_dim: int = 64,
+        seq_len: int = 20,
+        dropout: float = 0.1,
     ):
         super().__init__()
         self.robot_state_embedding = nn.Sequential(
@@ -49,13 +50,13 @@ class RobotStateObjectPoseEncoder(nn.Module):
         self,
         robot_state_dim: int,
         object_state_dim: int,
-        model_dim: int=256,
-        trans_out_dim: int=32,
-        trans_layers: int=4,
-        trans_heads: int=8,
-        z_dim: int=64,
-        seq_len: int=20,
-        dropout: float=0.1
+        model_dim: int = 256,
+        trans_out_dim: int = 32,
+        trans_layers: int = 4,
+        trans_heads: int = 8,
+        z_dim: int = 64,
+        seq_len: int = 20,
+        dropout: float = 0.1,
     ):
         super().__init__()
         self.robot_state_embedding = nn.Sequential(
@@ -69,7 +70,7 @@ class RobotStateObjectPoseEncoder(nn.Module):
             out_dim=trans_out_dim,
             num_heads=trans_heads,
             num_layers=trans_layers,
-            dropout=dropout
+            dropout=dropout,
         )
         self.out = nn.Linear(seq_len * trans_out_dim, z_dim)
 
@@ -87,11 +88,11 @@ class RobotStateVisionEncoder(nn.Module):
         self,
         robot_state_dim: int,
         vision_dim: int,
-        model_dim: int=256,
-        trans_out_dim: int=32,
-        z_dim: int=64,
-        seq_len: int=20,
-        dropout: float=0.1
+        model_dim: int = 256,
+        trans_out_dim: int = 32,
+        z_dim: int = 64,
+        seq_len: int = 20,
+        dropout: float = 0.1,
     ):
         super().__init__()
         self.robot_state_embedding = nn.Sequential(
@@ -105,7 +106,7 @@ class RobotStateVisionEncoder(nn.Module):
             out_dim=trans_out_dim,
             num_heads=8,
             num_layers=4,
-            dropout=dropout
+            dropout=dropout,
         )
         self.out = nn.Linear(seq_len * trans_out_dim, z_dim)
 
@@ -123,14 +124,14 @@ class SO2RobotStateObjectPoseEncoder(nn.Module):
         self,
         robot_state_type,
         object_state_type,
-        model_dim: int=64,
-        trans_out_dim: int=16,
-        trans_heads: int=8,
-        trans_layers: int=4,
-        L: int=3,
-        z_dim: int=64,
-        seq_len: int=20,
-        dropout: float=0.1
+        model_dim: int = 64,
+        trans_out_dim: int = 16,
+        trans_heads: int = 8,
+        trans_layers: int = 4,
+        L: int = 3,
+        z_dim: int = 64,
+        seq_len: int = 20,
+        dropout: float = 0.1,
     ):
         super().__init__()
 
@@ -146,11 +147,11 @@ class SO2RobotStateObjectPoseEncoder(nn.Module):
 
         self.robot_embedding = enn.SequentialModule(
             enn.FieldDropout(self.robot_state_type, dropout),
-            enn.Linear(self.robot_state_type, self.model_type)
+            enn.Linear(self.robot_state_type, self.model_type),
         )
         self.object_embedding = enn.SequentialModule(
             enn.FieldDropout(self.object_state_type, dropout),
-            enn.Linear(self.object_state_type, self.model_type)
+            enn.Linear(self.object_state_type, self.model_type),
         )
 
         self.transformer = SO2Transformer(
@@ -163,16 +164,24 @@ class SO2RobotStateObjectPoseEncoder(nn.Module):
             input_dropout=dropout,
         )
         self.out_type = enn.FieldType(self.gspace, [t] * z_dim)
-        self.out = SO2MLP(self.trans_type, self.out_type, [z_dim], [self.L], act_out=False)
+        self.out = SO2MLP(
+            self.trans_type, self.out_type, [z_dim], [self.L], act_out=False
+        )
 
     def forward(self, robot_state: torch.Tensor, object_state: torch.Tensor):
         batch_size = x.size(0)
 
         robot_state = self.robot_state_type(robot_state.view(batch_size * seq_len, -1))
-        robot_embed = self.robot_embedding(robot_state).tensor.view(batch_size, seq_len, -1)
+        robot_embed = self.robot_embedding(robot_state).tensor.view(
+            batch_size, seq_len, -1
+        )
 
-        object_state = self.object_state_type(object_state.view(batch_size * seq_len, -1))
-        object_embed = self.object_embedding(object_state).tensor.view(batch_size, seq_len, -1)
+        object_state = self.object_state_type(
+            object_state.view(batch_size * seq_len, -1)
+        )
+        object_embed = self.object_embedding(object_state).tensor.view(
+            batch_size, seq_len, -1
+        )
 
         x = self.transformer(robot_embed, query=object_embed)
         x = self.trans_type(x.tensor.view(batch_size, -1))

@@ -76,7 +76,7 @@ class MultiheadAttention(nn.Module):
         v = v.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
         v = v.permute(0, 2, 1, 3)  # [B, H, S, D]
         k = k.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
-        k = k.permute(0, 2, 1, 3) # [B, H, S, D]
+        k = k.permute(0, 2, 1, 3)  # [B, H, S, D]
         q = q.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
         q = q.permute(0, 2, 1, 3)  # [B, H, S, D]
 
