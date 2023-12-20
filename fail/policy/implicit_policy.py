@@ -51,7 +51,7 @@ class ImplicitPolicy(BasePolicy):
     def get_action(self, obs, goal, device):
         ngoal = self.normalizer["goal"].normalize(goal)
         nobs = self.normalizer["obs"].normalize(np.stack(obs))
-        #hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+        hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
         # hole_noise = 0
 
         policy_obs = nobs.unsqueeze(0).flatten(1, 2)
@@ -61,7 +61,7 @@ class ImplicitPolicy(BasePolicy):
         #    policy_obs[:, :, :3] + hole_noise
         #)
         obj_state = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
-            policy_obs[:, :, :3]# + hole_noise
+            policy_obs[:, :, :3] + torch.tensor(hole_noise).float()
         ).to(device)
         policy_obs = policy_obs.to(device)
 
