@@ -4,34 +4,45 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
+
 def convert_action_to_harmonics(action):
-    r = np.sqrt(action[:,0] ** 2 + action[:,1] ** 2)
-    theta = np.arctan2(action[:,1], (action[:,0]))
+    r = np.sqrt(action[:, 0] ** 2 + action[:, 1] ** 2)
+    theta = np.arctan2(action[:, 1], (action[:, 0]))
     theta[np.where(theta < 0)] += 2 * np.pi
 
     return r, theta
 
+
 def convert_harmonics_to_action(harmonics):
     pass
 
+
 def circular_harmonics(L, theta):
-    B = [torch.tensor([1 / np.sqrt(2 * np.pi)] * theta.size(0), device=theta.device).view(-1, 1)]
-    for l in range(1, L+1):
+    B = [
+        torch.tensor(
+            [1 / np.sqrt(2 * np.pi)] * theta.size(0), device=theta.device
+        ).view(-1, 1)
+    ]
+    for l in range(1, L + 1):
         B.append(l * torch.cos(theta) / np.sqrt(np.pi))
         B.append(l * torch.sin(theta) / np.sqrt(np.pi))
 
-    return torch.stack(B).permute(1,0,2).float()
+    return torch.stack(B).permute(1, 0, 2).float()
+
 
 def spherical_harmonics(lmax: int, x: torch.Tensor) -> torch.Tensor:
     x = F.normalize(x, dim=-1)
 
-    sh = _spherical_harmonics(lmax, x[:,0], x[:,1], x[:,2])
+    sh = _spherical_harmonics(lmax, x[:, 0], x[:, 1], x[:, 2])
     sh.div_(math.sqrt(4 * math.pi))
 
     return sh
 
+
 @torch.jit.script
-def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+def _spherical_harmonics(
+    lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.Tensor
+) -> torch.Tensor:
     sh_0_0 = torch.ones_like(x)
     if lmax == 0:
         return torch.stack(
@@ -56,7 +67,10 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
     sh_2_4 = (1 / 2) * math.sqrt(15) * (z.pow(2) - x.pow(2))
 
     if lmax == 2:
-        return torch.stack([sh_0_0, sh_1_0, sh_1_1, sh_1_2, sh_2_0, sh_2_1, sh_2_2, sh_2_3, sh_2_4], dim=-1)
+        return torch.stack(
+            [sh_0_0, sh_1_0, sh_1_1, sh_1_2, sh_2_0, sh_2_1, sh_2_2, sh_2_3, sh_2_4],
+            dim=-1,
+        )
 
     sh_3_0 = (1 / 6) * math.sqrt(42) * (sh_2_0 * z + sh_2_4 * x)
     sh_3_1 = math.sqrt(7) * sh_2_0 * y
@@ -90,7 +104,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         )
 
     sh_4_0 = (3 / 4) * math.sqrt(2) * (sh_3_0 * z + sh_3_6 * x)
-    sh_4_1 = (3 / 4) * sh_3_0 * y + (3 / 8) * math.sqrt(6) * sh_3_1 * z + (3 / 8) * math.sqrt(6) * sh_3_5 * x
+    sh_4_1 = (
+        (3 / 4) * sh_3_0 * y
+        + (3 / 8) * math.sqrt(6) * sh_3_1 * z
+        + (3 / 8) * math.sqrt(6) * sh_3_5 * x
+    )
     sh_4_2 = (
         -3 / 56 * math.sqrt(14) * sh_3_0 * z
         + (3 / 14) * math.sqrt(21) * sh_3_1 * y
@@ -104,7 +122,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (3 / 28) * math.sqrt(70) * sh_3_3 * x
         + (3 / 56) * math.sqrt(42) * sh_3_5 * x
     )
-    sh_4_4 = -3 / 28 * math.sqrt(42) * sh_3_2 * x + (3 / 7) * math.sqrt(7) * sh_3_3 * y - 3 / 28 * math.sqrt(42) * sh_3_4 * z
+    sh_4_4 = (
+        -3 / 28 * math.sqrt(42) * sh_3_2 * x
+        + (3 / 7) * math.sqrt(7) * sh_3_3 * y
+        - 3 / 28 * math.sqrt(42) * sh_3_4 * z
+    )
     sh_4_5 = (
         -3 / 56 * math.sqrt(42) * sh_3_1 * x
         + (3 / 28) * math.sqrt(70) * sh_3_3 * z
@@ -118,7 +140,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (3 / 14) * math.sqrt(21) * sh_3_5 * y
         - 3 / 56 * math.sqrt(14) * sh_3_6 * z
     )
-    sh_4_7 = -3 / 8 * math.sqrt(6) * sh_3_1 * x + (3 / 8) * math.sqrt(6) * sh_3_5 * z + (3 / 4) * sh_3_6 * y
+    sh_4_7 = (
+        -3 / 8 * math.sqrt(6) * sh_3_1 * x
+        + (3 / 8) * math.sqrt(6) * sh_3_5 * z
+        + (3 / 4) * sh_3_6 * y
+    )
     sh_4_8 = (3 / 4) * math.sqrt(2) * (-sh_3_0 * x + sh_3_6 * z)
     if lmax == 4:
         return torch.stack(
@@ -153,7 +179,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         )
 
     sh_5_0 = (1 / 10) * math.sqrt(110) * (sh_4_0 * z + sh_4_8 * x)
-    sh_5_1 = (1 / 5) * math.sqrt(11) * sh_4_0 * y + (1 / 5) * math.sqrt(22) * sh_4_1 * z + (1 / 5) * math.sqrt(22) * sh_4_7 * x
+    sh_5_1 = (
+        (1 / 5) * math.sqrt(11) * sh_4_0 * y
+        + (1 / 5) * math.sqrt(22) * sh_4_1 * z
+        + (1 / 5) * math.sqrt(22) * sh_4_7 * x
+    )
     sh_5_2 = (
         -1 / 30 * math.sqrt(22) * sh_4_0 * z
         + (4 / 15) * math.sqrt(11) * sh_4_1 * y
@@ -175,7 +205,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (1 / 15) * math.sqrt(33) * sh_4_6 * x
     )
     sh_5_5 = (
-        -1 / 15 * math.sqrt(110) * sh_4_3 * x + (1 / 3) * math.sqrt(11) * sh_4_4 * y - 1 / 15 * math.sqrt(110) * sh_4_5 * z
+        -1 / 15 * math.sqrt(110) * sh_4_3 * x
+        + (1 / 3) * math.sqrt(11) * sh_4_4 * y
+        - 1 / 15 * math.sqrt(110) * sh_4_5 * z
     )
     sh_5_6 = (
         -1 / 15 * math.sqrt(33) * sh_4_2 * x
@@ -197,7 +229,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (4 / 15) * math.sqrt(11) * sh_4_7 * y
         - 1 / 30 * math.sqrt(22) * sh_4_8 * z
     )
-    sh_5_9 = -1 / 5 * math.sqrt(22) * sh_4_1 * x + (1 / 5) * math.sqrt(22) * sh_4_7 * z + (1 / 5) * math.sqrt(11) * sh_4_8 * y
+    sh_5_9 = (
+        -1 / 5 * math.sqrt(22) * sh_4_1 * x
+        + (1 / 5) * math.sqrt(22) * sh_4_7 * z
+        + (1 / 5) * math.sqrt(11) * sh_4_8 * y
+    )
     sh_5_10 = (1 / 10) * math.sqrt(110) * (-sh_4_0 * x + sh_4_8 * z)
     if lmax == 5:
         return torch.stack(
@@ -244,7 +280,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
 
     sh_6_0 = (1 / 6) * math.sqrt(39) * (sh_5_0 * z + sh_5_10 * x)
     sh_6_1 = (
-        (1 / 6) * math.sqrt(13) * sh_5_0 * y + (1 / 12) * math.sqrt(130) * sh_5_1 * z + (1 / 12) * math.sqrt(130) * sh_5_9 * x
+        (1 / 6) * math.sqrt(13) * sh_5_0 * y
+        + (1 / 12) * math.sqrt(130) * sh_5_1 * z
+        + (1 / 12) * math.sqrt(130) * sh_5_9 * x
     )
     sh_6_2 = (
         -1 / 132 * math.sqrt(286) * sh_5_0 * z
@@ -274,7 +312,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (1 / 66) * math.sqrt(715) * sh_5_7 * x
     )
     sh_6_6 = (
-        -1 / 66 * math.sqrt(2145) * sh_5_4 * x + (1 / 11) * math.sqrt(143) * sh_5_5 * y - 1 / 66 * math.sqrt(2145) * sh_5_6 * z
+        -1 / 66 * math.sqrt(2145) * sh_5_4 * x
+        + (1 / 11) * math.sqrt(143) * sh_5_5 * y
+        - 1 / 66 * math.sqrt(2145) * sh_5_6 * z
     )
     sh_6_7 = (
         -1 / 66 * math.sqrt(715) * sh_5_3 * x
@@ -304,7 +344,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (1 / 33) * math.sqrt(715) * sh_5_9 * y
     )
     sh_6_11 = (
-        -1 / 12 * math.sqrt(130) * sh_5_1 * x + (1 / 6) * math.sqrt(13) * sh_5_10 * y + (1 / 12) * math.sqrt(130) * sh_5_9 * z
+        -1 / 12 * math.sqrt(130) * sh_5_1 * x
+        + (1 / 6) * math.sqrt(13) * sh_5_10 * y
+        + (1 / 12) * math.sqrt(130) * sh_5_9 * z
     )
     sh_6_12 = (1 / 6) * math.sqrt(39) * (-sh_5_0 * x + sh_5_10 * z)
     if lmax == 6:
@@ -364,7 +406,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         )
 
     sh_7_0 = (1 / 14) * math.sqrt(210) * (sh_6_0 * z + sh_6_12 * x)
-    sh_7_1 = (1 / 7) * math.sqrt(15) * sh_6_0 * y + (3 / 7) * math.sqrt(5) * sh_6_1 * z + (3 / 7) * math.sqrt(5) * sh_6_11 * x
+    sh_7_1 = (
+        (1 / 7) * math.sqrt(15) * sh_6_0 * y
+        + (3 / 7) * math.sqrt(5) * sh_6_1 * z
+        + (3 / 7) * math.sqrt(5) * sh_6_11 * x
+    )
     sh_7_2 = (
         -1 / 182 * math.sqrt(390) * sh_6_0 * z
         + (6 / 91) * math.sqrt(130) * sh_6_1 * y
@@ -400,7 +446,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (15 / 182) * math.sqrt(26) * sh_6_8 * x
     )
     sh_7_7 = (
-        -3 / 91 * math.sqrt(455) * sh_6_5 * x + (1 / 13) * math.sqrt(195) * sh_6_6 * y - 3 / 91 * math.sqrt(455) * sh_6_7 * z
+        -3 / 91 * math.sqrt(455) * sh_6_5 * x
+        + (1 / 13) * math.sqrt(195) * sh_6_6 * y
+        - 3 / 91 * math.sqrt(455) * sh_6_7 * z
     )
     sh_7_8 = (
         -15 / 182 * math.sqrt(26) * sh_6_4 * x
@@ -436,7 +484,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         - 1 / 182 * math.sqrt(390) * sh_6_12 * z
         - 3 / 91 * math.sqrt(715) * sh_6_2 * x
     )
-    sh_7_13 = -3 / 7 * math.sqrt(5) * sh_6_1 * x + (3 / 7) * math.sqrt(5) * sh_6_11 * z + (1 / 7) * math.sqrt(15) * sh_6_12 * y
+    sh_7_13 = (
+        -3 / 7 * math.sqrt(5) * sh_6_1 * x
+        + (3 / 7) * math.sqrt(5) * sh_6_11 * z
+        + (1 / 7) * math.sqrt(15) * sh_6_12 * y
+    )
     sh_7_14 = (1 / 14) * math.sqrt(210) * (-sh_6_0 * x + sh_6_12 * z)
     if lmax == 7:
         return torch.stack(
@@ -511,7 +563,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
 
     sh_8_0 = (1 / 4) * math.sqrt(17) * (sh_7_0 * z + sh_7_14 * x)
     sh_8_1 = (
-        (1 / 8) * math.sqrt(17) * sh_7_0 * y + (1 / 16) * math.sqrt(238) * sh_7_1 * z + (1 / 16) * math.sqrt(238) * sh_7_13 * x
+        (1 / 8) * math.sqrt(17) * sh_7_0 * y
+        + (1 / 16) * math.sqrt(238) * sh_7_1 * z
+        + (1 / 16) * math.sqrt(238) * sh_7_13 * x
     )
     sh_8_2 = (
         -1 / 240 * math.sqrt(510) * sh_7_0 * z
@@ -563,7 +617,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (1 / 80) * math.sqrt(1190) * sh_7_9 * x
     )
     sh_8_8 = (
-        -1 / 60 * math.sqrt(1785) * sh_7_6 * x + (1 / 15) * math.sqrt(255) * sh_7_7 * y - 1 / 60 * math.sqrt(1785) * sh_7_8 * z
+        -1 / 60 * math.sqrt(1785) * sh_7_6 * x
+        + (1 / 15) * math.sqrt(255) * sh_7_7 * y
+        - 1 / 60 * math.sqrt(1785) * sh_7_8 * z
     )
     sh_8_9 = (
         -1 / 80 * math.sqrt(1190) * sh_7_5 * x
@@ -615,7 +671,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         - 1 / 240 * math.sqrt(46410) * sh_7_2 * x
     )
     sh_8_15 = (
-        -1 / 16 * math.sqrt(238) * sh_7_1 * x + (1 / 16) * math.sqrt(238) * sh_7_13 * z + (1 / 8) * math.sqrt(17) * sh_7_14 * y
+        -1 / 16 * math.sqrt(238) * sh_7_1 * x
+        + (1 / 16) * math.sqrt(238) * sh_7_13 * z
+        + (1 / 8) * math.sqrt(17) * sh_7_14 * y
     )
     sh_8_16 = (1 / 4) * math.sqrt(17) * (-sh_7_0 * x + sh_7_14 * z)
     if lmax == 8:
@@ -756,7 +814,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (4 / 153) * math.sqrt(1615) * sh_8_7 * y
         + (1 / 51) * math.sqrt(1615) * sh_8_8 * x
     )
-    sh_9_9 = (1 / 51) * math.sqrt(323) * (-2 * sh_8_7 * x + 3 * sh_8_8 * y - 2 * sh_8_9 * z)
+    sh_9_9 = (
+        (1 / 51) * math.sqrt(323) * (-2 * sh_8_7 * x + 3 * sh_8_8 * y - 2 * sh_8_9 * z)
+    )
     sh_9_10 = (
         -1 / 153 * math.sqrt(4522) * sh_8_10 * z
         - 1 / 153 * math.sqrt(4522) * sh_8_6 * x
@@ -805,7 +865,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         - 1 / 306 * math.sqrt(646) * sh_8_16 * z
         - 2 / 153 * math.sqrt(4845) * sh_8_2 * x
     )
-    sh_9_17 = (1 / 9) * math.sqrt(19) * (-2 * sh_8_1 * x + 2 * sh_8_15 * z + sh_8_16 * y)
+    sh_9_17 = (
+        (1 / 9) * math.sqrt(19) * (-2 * sh_8_1 * x + 2 * sh_8_15 * z + sh_8_16 * y)
+    )
     sh_9_18 = (1 / 6) * math.sqrt(38) * (-sh_8_0 * x + sh_8_16 * z)
     if lmax == 9:
         return torch.stack(
@@ -916,7 +978,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
 
     sh_10_0 = (1 / 10) * math.sqrt(105) * (sh_9_0 * z + sh_9_18 * x)
     sh_10_1 = (
-        (1 / 10) * math.sqrt(21) * sh_9_0 * y + (3 / 20) * math.sqrt(42) * sh_9_1 * z + (3 / 20) * math.sqrt(42) * sh_9_17 * x
+        (1 / 10) * math.sqrt(21) * sh_9_0 * y
+        + (3 / 20) * math.sqrt(42) * sh_9_1 * z
+        + (3 / 20) * math.sqrt(42) * sh_9_17 * x
     )
     sh_10_2 = (
         -1 / 380 * math.sqrt(798) * sh_9_0 * z
@@ -1034,7 +1098,9 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         - 3 / 380 * math.sqrt(13566) * sh_9_2 * x
     )
     sh_10_19 = (
-        -3 / 20 * math.sqrt(42) * sh_9_1 * x + (3 / 20) * math.sqrt(42) * sh_9_17 * z + (1 / 10) * math.sqrt(21) * sh_9_18 * y
+        -3 / 20 * math.sqrt(42) * sh_9_1 * x
+        + (3 / 20) * math.sqrt(42) * sh_9_17 * z
+        + (1 / 10) * math.sqrt(21) * sh_9_18 * y
     )
     sh_10_20 = (1 / 10) * math.sqrt(105) * (-sh_9_0 * x + sh_9_18 * z)
     if lmax == 10:
@@ -1458,7 +1524,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         )
 
     sh_12_0 = (5 / 12) * math.sqrt(6) * (sh_11_0 * z + sh_11_22 * x)
-    sh_12_1 = (5 / 12) * sh_11_0 * y + (5 / 24) * math.sqrt(22) * sh_11_1 * z + (5 / 24) * math.sqrt(22) * sh_11_21 * x
+    sh_12_1 = (
+        (5 / 12) * sh_11_0 * y
+        + (5 / 24) * math.sqrt(22) * sh_11_1 * z
+        + (5 / 24) * math.sqrt(22) * sh_11_21 * x
+    )
     sh_12_2 = (
         -5 / 552 * math.sqrt(46) * sh_11_0 * z
         + (5 / 138) * math.sqrt(253) * sh_11_1 * y
@@ -1610,7 +1680,11 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         + (5 / 138) * math.sqrt(253) * sh_11_21 * y
         - 5 / 552 * math.sqrt(46) * sh_11_22 * z
     )
-    sh_12_23 = -5 / 24 * math.sqrt(22) * sh_11_1 * x + (5 / 24) * math.sqrt(22) * sh_11_21 * z + (5 / 12) * sh_11_22 * y
+    sh_12_23 = (
+        -5 / 24 * math.sqrt(22) * sh_11_1 * x
+        + (5 / 24) * math.sqrt(22) * sh_11_21 * z
+        + (5 / 12) * sh_11_22 * y
+    )
     sh_12_24 = (5 / 12) * math.sqrt(6) * (-sh_11_0 * x + sh_11_22 * z)
 
     return torch.stack(
@@ -1788,12 +1862,13 @@ def _spherical_harmonics(lmax: int, x: torch.Tensor, y: torch.Tensor, z: torch.T
         dim=-1,
     )
 
-def plot_energy_circle(E):
-  fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-  ax.plot(np.linspace(0, 2*np.pi, 360), E)
-  ax.set_rmax(np.max(E))
-  ax.set_rticks(np.round(np.linspace(np.min(E), np.max(E), 5), 3))
-  ax.grid(True)
 
-  ax.set_title("Energy", va='bottom')
-  plt.show()
+def plot_energy_circle(E):
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"})
+    ax.plot(np.linspace(0, 2 * np.pi, 360), E)
+    ax.set_rmax(np.max(E))
+    ax.set_rticks(np.round(np.linspace(np.min(E), np.max(E), 5), 3))
+    ax.grid(True)
+
+    ax.set_title("Energy", va="bottom")
+    plt.show()

@@ -71,18 +71,24 @@ class SO2MultiheadAttention(nn.Module):
         v = self.v_proj(x).tensor
 
         # Seperate Q, K, V
-        q = q.reshape(batch_size, seq_len, self.num_heads, self.irreps_dim * self.head_dim)
+        q = q.reshape(
+            batch_size, seq_len, self.num_heads, self.irreps_dim * self.head_dim
+        )
         q = q.permute(0, 2, 1, 3)  # [B, H, S, L*D]
-        k = k.reshape(batch_size, seq_len, self.num_heads, self.irreps_dim * self.head_dim)
+        k = k.reshape(
+            batch_size, seq_len, self.num_heads, self.irreps_dim * self.head_dim
+        )
         k = k.permute(0, 2, 1, 3)  # [B, H, S, L*D]
-        v = v.reshape(batch_size, seq_len, self.num_heads, self.irreps_dim * self.head_dim)
+        v = v.reshape(
+            batch_size, seq_len, self.num_heads, self.irreps_dim * self.head_dim
+        )
         v = v.permute(0, 2, 1, 3)  # [B, H, S, L*D]
 
         values, attention = scaledDotProduct(q, k, v, mask=mask)
         values = values.permute(0, 2, 1, 3)  # [B, S, H, L*D]
         values = values.reshape(batch_size * seq_len, embed_dim)
         o = self.o_proj(self.in_type(values))
-        #o = o.tensor.reshape(batch_size, seq_len, -1)
+        # o = o.tensor.reshape(batch_size, seq_len, -1)
 
         if return_attention:
             return o, attention
@@ -97,10 +103,17 @@ class SO2EncoderBlock(nn.Module):
         self.L = L
 
         self.attn = SO2MultiheadAttention(in_type, L, in_dim, num_heads)
-        self.mlp = SO2MLP(in_type, in_type, [hidden_dim, in_dim], [self.L, self.L], dropout=dropout, act_out=False)
+        self.mlp = SO2MLP(
+            in_type,
+            in_type,
+            [hidden_dim, in_dim],
+            [self.L, self.L],
+            dropout=dropout,
+            act_out=False,
+        )
 
-        #self.norm1 = nn.LayerNorm(in_dim)
-        #self.norm2 = nn.LayerNorm(in_dim)
+        # self.norm1 = nn.LayerNorm(in_dim)
+        # self.norm2 = nn.LayerNorm(in_dim)
         self.dropout1 = enn.FieldDropout(self.in_type, dropout)
         self.dropout2 = enn.FieldDropout(self.mlp.out_type, dropout)
 
@@ -109,9 +122,9 @@ class SO2EncoderBlock(nn.Module):
 
         attn_out = self.attn(x, query=query, mask=mask)
         x = self.in_type(x.view(batch_size * seq_len, -1)) + self.dropout1(attn_out)
-        #x = self.norm1(x)
+        # x = self.norm1(x)
         x = x + self.dropout2(self.mlp(x))
-        #x = self.norm2(x)
+        # x = self.norm2(x)
 
         return x
 
@@ -119,7 +132,7 @@ class SO2EncoderBlock(nn.Module):
 class SO2TransformerEncoder(nn.Module):
     def __init__(self, num_layers, **block_args):
         super().__init__()
-        self.in_type = block_args['in_type']
+        self.in_type = block_args["in_type"]
 
         self.layers = nn.ModuleList(
             [SO2EncoderBlock(**block_args) for _ in range(num_layers)]
@@ -146,13 +159,13 @@ class SO2TransformerEncoder(nn.Module):
 class SO2Transformer(nn.Module):
     def __init__(
         self,
-        L: int=3,
-        model_dim: int=64,
-        out_dim: int=32,
-        num_heads: int=8,
-        num_layers: int=4,
-        dropout: float==0.0,
-        input_dropout: float=0.0,
+        L: int = 3,
+        model_dim: int = 64,
+        out_dim: int = 32,
+        num_heads: int = 8,
+        num_layers: int = 4,
+        dropout: float = 0.0,
+        input_dropout: float = 0.0,
     ):
         super().__init__()
 
@@ -163,7 +176,7 @@ class SO2Transformer(nn.Module):
         t = self.G.bl_regular_representation(L=self.L)
         model_type = enn.FieldType(self.gspace, [t] * model_dim)
         self.out_type = model_type
-        #self.pos_enc = PositionalEncoding(d_model=model_dim)
+        # self.pos_enc = PositionalEncoding(d_model=model_dim)
         self.transformer = SO2TransformerEncoder(
             num_layers=num_layers,
             in_type=model_type,
@@ -173,19 +186,26 @@ class SO2Transformer(nn.Module):
             num_heads=num_heads,
             dropout=dropout,
         )
-        self.out = SO2MLP(model_type, self.out_type, [model_dim, out_dim], [self.L, self.L], act_out=False, dropout=dropout)
+        self.out = SO2MLP(
+            model_type,
+            self.out_type,
+            [model_dim, out_dim],
+            [self.L, self.L],
+            act_out=False,
+            dropout=dropout,
+        )
 
     def forward(self, x, query=None, mask=None, add_pos_enc=True):
         batch_size, seq_len, in_dim = x.size()  # [B, S, D]
 
-        #if add_pos_enc:
+        # if add_pos_enc:
         #    x = self.pos_enc(x)
         x = self.transformer(x, query=query, mask=mask)
         x = self.out(x)
         return x
 
     def getAttnMaps(self, x, query=None, mask=None, add_pos_enc=True):
-        #if add_pos_enc:
+        # if add_pos_enc:
         #    x = self.pos_enc(x)
         attn_maps = self.transformer.getAttnMaps(x, query=query, mask=mask)
         return attn_maps

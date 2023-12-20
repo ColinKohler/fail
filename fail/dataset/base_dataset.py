@@ -14,14 +14,12 @@ class BaseDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         path: str,
-        horizon: int=1,
-        pad_before: int=0,
-        pad_after: int=0,
-        obs_key: str="state",
-        action_key: str="action",
-        harmonic_action: bool=False,
-        seed: int=0,
-        val_ratio: float=0.0,
+        horizon: int = 1,
+        pad_before: int = 0,
+        pad_after: int = 0,
+        harmonic_action: bool = False,
+        seed: int = 0,
+        val_ratio: float = 0.0,
     ):
         super().__init__()
 
@@ -44,9 +42,7 @@ class BaseDataset(torch.utils.data.Dataset):
         self.horizon = horizon
         self.pad_before = pad_before
         self.pad_after = pad_after
-        self.obs_key = obs_key
-        self.action_key = action_key
-        self.harmonic_action=harmonic_action
+        self.harmonic_action = harmonic_action
 
         self.normalizer = self.get_normalizer()
 
@@ -76,7 +72,10 @@ class BaseDataset(torch.utils.data.Dataset):
         data = self._sample_to_data(sample)
 
         if self.harmonic_action:
-            data['action'] = harmonics.convert_action_to_harmonics(data['action'])
+            data["action"] = harmonics.convert_action_to_harmonics(data["action"])
 
         torch_data = torch_utils.dict_apply(data, torch.from_numpy)
         return self.normalizer.normalize(torch_data)
+
+    def _sample_to_data(self, sample):
+        raise NotImplementedError()

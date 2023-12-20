@@ -126,22 +126,22 @@ class ReplayBuffer(object):
 
     def load_from_path(self, path):
         # Load meta data
-        with h5py.File(f'{path}/meta.hdf5', 'r') as f:
+        with h5py.File(f"{path}/meta.hdf5", "r") as f:
             for key in f.keys():
                 self.meta[key] = f.get(key)[:]
 
         # Load data
-        with h5py.File(f'{path}/data.hdf5', 'r') as f:
+        with h5py.File(f"{path}/data.hdf5", "r") as f:
             for key in f.keys():
                 self.data[key] = f.get(key)[:]
 
     def save_to_path(self, path):
         # Save meta data
-        with h5py.File(f'{path}/meta.hdf5', 'w') as f:
+        with h5py.File(f"{path}/meta.hdf5", "w") as f:
             for key, value in self.meta.items():
                 f.create_dataset(key, data=value)
 
         # Save data
-        with h5py.File(f'{path}/data.hdf5', 'w') as f:
+        with h5py.File(f"{path}/data.hdf5", "w") as f:
             for key, value in self.data.items():
                 f.create_dataset(key, data=value)

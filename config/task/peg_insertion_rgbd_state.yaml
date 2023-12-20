@@ -1,8 +1,8 @@
-name: block_touching 
+name: peg_insertion
 
 dataset:
   _target_: fail.dataset.base_dataset.BaseDataset
-  path: data/100_touch_expert
+  path: data/100_expert
   horizon: ${obs_horizon}
   pad_before: 0
   pad_after: 0

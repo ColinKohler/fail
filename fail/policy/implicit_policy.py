@@ -21,7 +21,7 @@ class ImplicitPolicy(BasePolicy):
         seq_len,
         z_dim,
         dropout,
-        encoder
+        encoder,
     ):
         super().__init__(action_dim, seq_len, z_dim)
         self.num_neg_act_samples = num_neg_act_samples
@@ -48,22 +48,18 @@ class ImplicitPolicy(BasePolicy):
 
         return out.view(B, N)
 
-    def get_action(self, obs, goal, device):
-        ngoal = self.normalizer["goal"].normalize(goal)
-        nobs = self.normalizer["obs"].normalize(np.stack(obs))
-        #hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+    def get_action(self, robot_state, object_state, device):
+        nrobot_state = self.normalizer["robot_state"].normalize(np.stack(robot_state))
+        nobject_state = self.normalizer["object_state"].normalize(object_state)
+        # hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
         # hole_noise = 0
 
-        policy_obs = nobs.unsqueeze(0).flatten(1, 2)
-        #obj_state = ngoal.view(1,1,3).repeat(1, self.seq_len, 1)
-        # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
-        #policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
-        #    policy_obs[:, :, :3] + hole_noise
-        #)
-        obj_state = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
-            policy_obs[:, :, :3]# + hole_noise
+        robot_state = nrobot_state.unsqueeze(0).flatten(1, 2)
+        object_state = nobject_state.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
+            robot_state[:, :, :3]  # + hole_noise
         ).to(device)
-        policy_obs = policy_obs.to(device)
+        robot_state = robot_state.to(device)
+        object_state = object_state.to(device)
 
         # Sample actions: (1, num_samples, Da)
         action_stats = self.get_action_stats()
@@ -77,9 +73,7 @@ class ImplicitPolicy(BasePolicy):
         zero = torch.tensor(0, device=device)
         resample_std = torch.tensor(3e-2, device=device)
         for i in range(self.pred_n_iter):
-            logits = self.forward(policy_obs, obj_state, samples)
-            # attn = self.encoder.transformer.getAttnMaps(policy_obs)
-            # torch_utils.plotAttnMaps(torch.arange(9).view(1,9), attn)
+            logits = self.forward(robot_state, object_state, samples)
 
             prob = torch.softmax(logits, dim=-1)
 
@@ -98,18 +92,16 @@ class ImplicitPolicy(BasePolicy):
 
     def compute_loss(self, batch):
         # Load batch
-        nobs = batch["obs"].float()
+        nrobot_state = batch["robot_state"].float()
+        nobject_state = batch["object_state"].float()
         naction = batch["action"].float()
-        ngoal = batch["goal"].float()
 
-        B = nobs.shape[0]
-        obs = nobs.flatten(1, 2)
-        #obj_state = ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1)
-        # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
-        #obs[:, :, :3] = (
-        #    ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
-        #)
-        obj_state = (ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3])
+        B = nrobot_state.shape[0]
+        robot_state = nrobot_state.flatten(1, 2)
+        object_state = (
+            nobject_state[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1)
+            - robot_state[:, :, :3]
+        )
 
         # Add noise to positive samples
         batch_size = naction.size(0)
@@ -139,7 +131,7 @@ class ImplicitPolicy(BasePolicy):
         targets = targets[torch.arange(targets.size(0)).unsqueeze(-1), permutation]
         ground_truth = (permutation == 0).nonzero()[:, 1].to(naction.device)
 
-        energy = self.forward(obs, obj_state, targets)
+        energy = self.forward(robot_state, object_state, targets)
         # logits = -1.0 * energy
         loss = F.cross_entropy(energy, ground_truth)
 
