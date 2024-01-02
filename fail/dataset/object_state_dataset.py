@@ -24,7 +24,7 @@ class ObjectStateDataset(BaseDataset):
     def _sample_to_data(self, sample):
         data = {
             "robot_state": sample["robot_state"],  # T, D_r
-            "object_state": sample["object_state"],  # 1, D_o
+            "world_state": sample["object_state"],  # 1, D_o
             "action": sample["action"],  # T, D_a
         }
         return data

@@ -6,21 +6,25 @@ name: train_implicit_policy
 _target_: fail.workflow.implicit_workflow.ImplicitWorkflow
 
 robot_state_dim: ${task.robot_state_dim}
-object_state_dim: ${task.object_state_dim}
+world_state_dim: ${task.object_state_dim}
 action_dim: ${task.action_dim}
+num_action_steps: 1
 task_name: ${task.name}
 exp_name: 'default'
 
-obs_horizon: 2
-obs_key_points: 10
-n_action_steps: 1
+num_obs_steps: 2
+robot_state_step_len: 10
+robot_state_len: ${eval:'${num_obs_steps}*${robot_state_step_len}'}
+world_state_len: ${task.world_state_len}
 z_dim: ${task.z_dim}
 encoder: ${task.encoder}
 
 policy:
   _target_: fail.policy.implicit_policy.ImplicitPolicy
   action_dim: ${action_dim}
-  seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
+  num_action_steps: ${num_action_steps}
+  robot_state_len: ${robot_state_len}
+  world_state_len: ${world_state_len}
   z_dim: ${z_dim}
   num_neg_act_samples: 1024
   pred_n_iter: 3

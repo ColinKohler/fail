@@ -50,12 +50,13 @@ class RobotStateObjectPoseEncoder(nn.Module):
         self,
         robot_state_dim: int,
         object_state_dim: int,
+        robot_state_len: int,
+        object_state_len: int,
         model_dim: int = 256,
         trans_out_dim: int = 32,
         trans_layers: int = 4,
         trans_heads: int = 8,
         z_dim: int = 64,
-        seq_len: int = 20,
         dropout: float = 0.1,
     ):
         super().__init__()
@@ -72,7 +73,7 @@ class RobotStateObjectPoseEncoder(nn.Module):
             num_layers=trans_layers,
             dropout=dropout,
         )
-        self.out = nn.Linear(seq_len * trans_out_dim, z_dim)
+        self.out = nn.Linear(robot_state_len * trans_out_dim, z_dim)
 
     def forward(self, robot_state, object_state) -> torch.Tensor:
         batch_size = robot_state.size(0)
@@ -88,10 +89,11 @@ class RobotStateVisionEncoder(nn.Module):
         self,
         robot_state_dim: int,
         vision_dim: int,
+        robot_state_len: int,
+        vision_state_len: int,
         model_dim: int = 256,
         trans_out_dim: int = 32,
         z_dim: int = 64,
-        seq_len: int = 20,
         dropout: float = 0.1,
     ):
         super().__init__()
@@ -108,7 +110,7 @@ class RobotStateVisionEncoder(nn.Module):
             num_layers=4,
             dropout=dropout,
         )
-        self.out = nn.Linear(seq_len * trans_out_dim, z_dim)
+        self.out = nn.Linear(robot_state_len * trans_out_dim, z_dim)
 
     def forward(self, robot_state: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
         batch_size = robot_state.size(0)
@@ -124,13 +126,14 @@ class SO2RobotStateObjectPoseEncoder(nn.Module):
         self,
         robot_state_type,
         object_state_type,
+        robot_state_len: int,
+        object_state_len: int,
         model_dim: int = 64,
         trans_out_dim: int = 16,
         trans_heads: int = 8,
         trans_layers: int = 4,
         L: int = 3,
         z_dim: int = 64,
-        seq_len: int = 20,
         dropout: float = 0.1,
     ):
         super().__init__()
@@ -143,7 +146,7 @@ class SO2RobotStateObjectPoseEncoder(nn.Module):
         self.robot_state_type = robot_state_type
         self.object_state_type = object_state_type
         self.model_type = enn.FieldType(self.gspace, [t] * model_dim)
-        self.trans_out_type = enn.FieldType(self.gspace, [t] * trans_out_dim * seq_len)
+        self.trans_out_type = enn.FieldType(self.gspace, [t] * trans_out_dim * robot_state_len)
 
         self.robot_embedding = enn.SequentialModule(
             enn.FieldDropout(self.robot_state_type, dropout),
