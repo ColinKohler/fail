@@ -5,6 +5,18 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
 
+def convert_action_to_harmonics(action):
+    r = np.sqrt(action[:, 0] ** 2 + action[:, 1] ** 2)
+    theta = np.arctan2(action[:, 1], (action[:, 0]))
+    theta[np.where(theta < 0)] += 2 * np.pi
+
+    return r, theta
+
+
+def convert_harmonics_to_action(harmonics):
+    pass
+
+
 def circular_harmonics(L, theta):
     B = [
         torch.tensor(
