@@ -35,7 +35,7 @@ so2_encoder:
 
 dataset:
   _target_: fail.dataset.object_state_dataset.ObjectStateDataset
-  path: data/block_touching_10
+  path: data/block_touching_100
   horizon: ${num_obs_steps}
   pad_before: 0
   pad_after: ${eval:'${num_action_steps}-1'}
