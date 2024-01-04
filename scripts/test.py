@@ -53,7 +53,7 @@ def test(checkpoint, num_eps=100, render=False):
 
     for eps in range(num_eps):
         goal, obs = env.reset()
-        obs_deque = collections.deque([obs] * config.obs_horizon, maxlen=config.obs_horizon)
+        obs_deque = collections.deque([obs] * config.num_obs_steps, maxlen=config.num_obs_steps)
         terminate = False
         while not terminate:
             action = policy.get_action(obs_deque, goal, device)
