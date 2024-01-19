@@ -1,8 +1,8 @@
-name: block_touching 
+name: block_touching_object_state
 
 robot_state_dim: 9
 object_state_dim: 3
-world_state_len: ${robot_state_len}
+num_world_state: ${num_robot_state}
 action_dim: 2
 z_dim: 64
 
@@ -33,11 +33,28 @@ so2_encoder:
   z_dim: ${z_dim}
   dropout: 0.1
 
+env_runner: 
+  _target_:  fail.env_runner.block_touching_object_state.BlockTouchingObjectStateRunner
+  num_train: 6
+  num_train_vis: 2
+  train_start_seed: 0
+  num_test: 50
+  num_test_vis: 4
+  test_start_seed: 100000
+  max_steps: 350
+  num_obs_steps: ${num_obs_steps}
+  num_action_steps: ${num_action_steps}
+  fps: 5
+  past_action: ${past_action_visible}
+  abs_action: False
+  num_envs: null
+
 dataset:
   _target_: fail.dataset.object_state_dataset.ObjectStateDataset
   path: data/block_touching_100
   horizon: ${num_obs_steps}
-  pad_before: 0
+  pad_before: ${eval:'${num_obs_steps}-1'}
   pad_after: ${eval:'${num_action_steps}-1'}
   seed: 0
+  harmonic_action: ${is_harmonic}
   val_ratio: 0.02

@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - task: peg_insertion_object_state
+  - task: block_touching_object_state
 
 name: train_implicit_policy
 _target_: fail.workflow.implicit_workflow.ImplicitWorkflow
@@ -8,27 +8,31 @@ _target_: fail.workflow.implicit_workflow.ImplicitWorkflow
 robot_state_dim: ${task.robot_state_dim}
 world_state_dim: ${task.object_state_dim}
 action_dim: ${task.action_dim}
-num_action_steps: 1
 task_name: ${task.name}
 exp_name: 'default'
+num_action_steps: 1
+is_harmonic: False
 
+num_action_steps: 1
 num_obs_steps: 2
 robot_state_step_len: 10
-robot_state_len: ${eval:'${num_obs_steps}*${robot_state_step_len}'}
-world_state_len: ${task.world_state_len}
+num_robot_state: ${eval:'${num_obs_steps}*${num_robot_state_step}'}
+num_world_state: ${task.num_world_state}
 z_dim: ${task.z_dim}
 encoder: ${task.encoder}
 
 policy:
   _target_: fail.policy.implicit_policy.ImplicitPolicy
+  robot_state_dim: ${robot_state_dim}
+  world_state_dim: ${world_state_dim}
   action_dim: ${action_dim}
   num_action_steps: ${num_action_steps}
-  robot_state_len: ${robot_state_len}
-  world_state_len: ${world_state_len}
+  num_robot_state: ${num_robot_state}
+  num_world_state: ${num_world_state}
   z_dim: ${z_dim}
-  num_neg_act_samples: 1024
+  num_neg_act_samples: 256
   pred_n_iter: 3
-  pred_n_samples: 2048
+  pred_n_samples: 4096
   dropout: 0.1
 
 dataloader:
@@ -70,6 +74,15 @@ logging:
   tags: ["${name}", "${task_name}", "${exp_name}"]
   id: null
   group: null
+
+checkpoint:
+  topk:
+    monitor_key: test_mean_score
+    mode: max
+    k: 5
+    format_str: 'epoch={epoch:04d}-test_mean_score={test_mean_score:.3f}.ckpt'
+  save_last_checkpoint: True
+  save_last_snapshot: False
 
 multi_run:
   run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
