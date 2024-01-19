@@ -52,7 +52,9 @@ def test(checkpoint, num_eps=100, render=False):
     sr = 0
 
     for eps in range(num_eps):
+        hole_noise = npr.uniform([-0.005, -0.005, 0.0], [0.005, 0.005, 0])
         goal, obs = env.reset()
+        goal += hole_noise
         obs_deque = collections.deque([obs] * config.num_obs_steps, maxlen=config.num_obs_steps)
         terminate = False
         while not terminate:

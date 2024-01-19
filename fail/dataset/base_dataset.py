@@ -20,6 +20,7 @@ class BaseDataset(torch.utils.data.Dataset):
         harmonic_action: bool = False,
         seed: int = 0,
         val_ratio: float = 0.0,
+        max_train_episodes: int = None,
     ):
         super().__init__()
 
@@ -30,6 +31,11 @@ class BaseDataset(torch.utils.data.Dataset):
             n_episodes=self.replay_buffer.n_episodes, val_ratio=val_ratio, seed=seed
         )
         self.train_mask = ~val_mask
+        self.train_mask = downsample_mask(
+            mask=self.train_mask,
+            max_n=max_train_episodes,
+            seed=seed
+        )
 
         self.sampler = SequenceSampler(
             replay_buffer=self.replay_buffer,
@@ -60,6 +66,8 @@ class BaseDataset(torch.utils.data.Dataset):
 
     def get_normalizer(self, mode="limits", **kwargs):
         data = self._sample_to_data(self.replay_buffer)
+        if self.harmonic_action:
+            data["action"] = harmonics.convert_action_to_harmonics(data["action"])
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
         return normalizer

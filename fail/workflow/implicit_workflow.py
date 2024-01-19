@@ -18,6 +18,7 @@ from fail.policy.implicit_policy import ImplicitPolicy
 from fail.model.modules import PoseForceEncoder
 from fail.utils import torch_utils
 from fail.utils.json_logger import JsonLogger
+from fail.utils.checkpoint_manager import TopKCheckpointManager
 
 OmegaConf.register_new_resolver("eval", eval, replace=True)
 
@@ -53,6 +54,7 @@ class ImplicitWorkflow(BaseWorkflow):
                 print(f"Resuming from checkpoint {lastest_ckpt_path}")
                 self.load_checkpoint(path=lastest_ckpt_path)
 
+        # Datasets
         dataset: BaseDataset
         dataset = hydra.utils.instantiate(self.config.task.dataset)
         train_dataloader = DataLoader(dataset, **self.config.dataloader)
@@ -63,6 +65,7 @@ class ImplicitWorkflow(BaseWorkflow):
 
         self.model.set_normalizer(normalizer)
 
+        # LR scheduler
         lr_scheduler = torch_utils.CosineWarmupScheduler(
             self.optimizer,
             self.config.training.lr_warmup_steps,
@@ -71,6 +74,10 @@ class ImplicitWorkflow(BaseWorkflow):
 
         device = torch.device(self.config.training.device)
         self.model.to(device)
+
+        # Env runner
+        #env_runner: BaseRunner
+        #env_runner = hydra.utils.instantiate(self.config.task.env_runner, output_dir=self.output_dir)
 
         # Setup logging
         wandb_run = wandb.init(
@@ -85,6 +92,13 @@ class ImplicitWorkflow(BaseWorkflow):
         )
         log_path = os.path.join(self.output_dir, "logs.json.txt")
 
+        # Checkpointer
+        topk_manager = TopKCheckpointManager(
+            save_dir=os.path.join(self.output_dir, 'checkpoints'),
+            **self.config.checkpoint.topk
+        )
+
+        # Training
         with JsonLogger(log_path) as json_logger:
             for epoch in range(self.config.training.num_epochs):
                 step_log = dict()
@@ -118,6 +132,7 @@ class ImplicitWorkflow(BaseWorkflow):
                             "train_loss": loss_cpu,
                             "global_step": self.global_step,
                             "epoch": self.epoch,
+                            'lr': lr_scheduler.get_last_lr()[0],
                         }
 
                         is_last_batch = batch_idx == len(train_dataloader) - 1
@@ -133,30 +148,42 @@ class ImplicitWorkflow(BaseWorkflow):
 
                 # Validation
                 self.model.eval()
+
+                #if self.epoch % self.config.training.rollout_every == 0:
+                #    runner_log = env_runner.run(self.model)
+                #    step_log.update(runner_log)
+
                 if self.epoch % self.config.training.val_every == 0:
-                    with torch.no_grad():
-                        val_losses = list()
-                        with tqdm(
-                            val_dataloader,
-                            desc=f"Validation epoch {self.epoch}",
-                            leave=False,
-                            mininterval=self.config.training.tqdm_interval_sec,
-                        ) as tepoch:
-                            for batch_idx, batch in enumerate(tepoch):
-                                batch = torch_utils.dict_apply(
-                                    batch, lambda x: x.to(device, non_blocking=True)
-                                )
+                    val_losses = list()
+                    with tqdm(
+                        val_dataloader,
+                        desc=f"Validation epoch {self.epoch}",
+                        leave=False,
+                        mininterval=self.config.training.tqdm_interval_sec,
+                    ) as tepoch:
+                        for batch_idx, batch in enumerate(tepoch):
+                            batch = torch_utils.dict_apply(
+                                batch, lambda x: x.to(device, non_blocking=True)
+                            )
 
-                                # Compute loss
-                                loss = self.model.compute_loss(batch)
-                                val_losses.append(loss)
+                            # Compute loss
+                            loss = self.model.compute_loss(batch)
+                            val_losses.append(loss)
 
-                                if len(val_losses) > 0:
-                                    step_log["val_loss"] = loss
+                            if len(val_losses) > 0:
+                                step_log["val_loss"] = loss
 
                 # Checkpoint
                 if (self.epoch % self.config.training.checkpoint_every) == 0:
-                    self.save_checkpoint()
+                    if self.config.checkpoint.save_last_checkpoint:
+                        self.save_checkpoint()
+
+                    metric_dict = dict()
+                    for k, v in step_log.items():
+                        metric_dict[k.replace('/', '_')] = v
+                    topk_checkpoint_path = topk_manager.get_ckpt_path(metric_dict)
+                    if topk_checkpoint_path is not None:
+                        self.save_checkpoint(path=topk_checkpoint_path)
 
                 # Bookkeeping
                 wandb_run.log(step_log, step=self.global_step)

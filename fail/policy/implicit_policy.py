@@ -9,23 +9,26 @@ from fail.model.layers import MLP
 from fail.utils.normalizer import LinearNormalizer
 from fail.utils import torch_utils
 from fail.policy.base_policy import BasePolicy
+from fail.utils import mcmc
 
 
 class ImplicitPolicy(BasePolicy):
     def __init__(
         self,
-        action_dim,
-        num_action_steps,
-        num_neg_act_samples,
-        pred_n_iter,
-        pred_n_samples,
-        robot_state_len,
-        world_state_len,
-        z_dim,
-        dropout,
-        encoder,
+        robot_state_dim: int,
+        world_state_dim: int,
+        action_dim: int,
+        num_action_steps: int,
+        num_robot_state: int,
+        num_world_state: int,
+        num_neg_act_samples: int,
+        pred_n_iter: int,
+        pred_n_samples: int,
+        z_dim: int,
+        dropout: float,
+        encoder: nn.Module,
     ):
-        super().__init__(action_dim, num_action_steps, robot_state_len, world_state_len, z_dim)
+        super().__init__(robot_state_dim, world_state_dim, action_dim, num_robot_state, num_world_state, num_action_steps, z_dim)
         self.num_neg_act_samples = num_neg_act_samples
         self.pred_n_iter = pred_n_iter
         self.pred_n_samples = pred_n_samples
@@ -57,13 +60,14 @@ class ImplicitPolicy(BasePolicy):
     def get_action(self, robot_state, world_state, device):
         nrobot_state = self.normalizer["robot_state"].normalize(np.stack(robot_state))
         nworld_state = self.normalizer["world_state"].normalize(world_state)
-        hole_noise = npr.uniform([-0.250, -0.250, 0.0], [0.250, 0.250, 0])
-        # hole_noise = 0
+
+        B = nrobot_state.size(0)
+        Ta = self.num_action_steps
+        Tr = self.num_robot_state
+        Tw = self.num_world_state
 
         robot_state = nrobot_state.unsqueeze(0).flatten(1, 2)
-        world_state = nworld_state.view(1, 1, 3).repeat(1, self.robot_state_len, 1) - (
-            robot_state[:, :, :3]  + hole_noise
-        )
+        world_state = nworld_state.view(1, 1, 3).repeat(1, Tr, 1) - robot_state[:, :, :3]
         robot_state = robot_state.to(device).float()
         world_state = world_state.to(device).float()
 
@@ -72,29 +76,19 @@ class ImplicitPolicy(BasePolicy):
         action_dist = torch.distributions.Uniform(
             low=action_stats["min"], high=action_stats["max"]
         )
-        samples = action_dist.sample((1, self.pred_n_samples, self.num_action_steps)).to(
+        samples = action_dist.sample((B, self.pred_n_samples, T)).to(
             dtype=robot_state.dtype
         )
 
-        zero = torch.tensor(0, device=device)
-        resample_std = torch.tensor(3e-2, device=device)
-        for i in range(self.pred_n_iter):
-            logits = self.forward(robot_state, world_state, samples)
+        action_probs, actions = mcmc.iterative_dfo(
+            self,
+            nobs,
+            actions,
+            [action_stats['min'], action_stats['max']],
+        )
 
-            prob = torch.softmax(logits, dim=-1)
-
-            if i < (self.pred_n_iter - 1):
-                idxs = torch.multinomial(prob, self.pred_n_samples, replacement=True)
-                samples = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs]
-                samples += torch.normal(
-                    zero, resample_std, size=samples.shape, device=device
-                )
-
-        idxs = torch.multinomial(prob, num_samples=1, replacement=True)
-        acts_n = samples[torch.arange(samples.size(0)).unsqueeze(-1), idxs].squeeze(1)
-        action = self.normalizer["action"].unnormalize(acts_n).cpu().squeeze()
-
-        return action
+        actions = self.normalizer["action"].unnormalize(actions)
+        return {'action': actions}
 
     def compute_loss(self, batch):
         # Load batch
@@ -103,23 +97,24 @@ class ImplicitPolicy(BasePolicy):
         naction = batch["action"].float()
 
         Da = self.action_dim
-        Tr = self.robot_state_len
-        Tw = self.world_state_len
+        Tr = self.num_robot_state
+        Tw = self.num_world_state
         Ta = self.num_action_steps
         B = nrobot_state.shape[0]
 
+        nrobot_state[:,:Tr]
+        nworld_state[:,:Tw]
         start = 1
         end = start + Ta
-        naction = naction[:,1:end]
+        naction = naction[:,start:end]
 
         robot_state = nrobot_state.flatten(1, 2)
         world_state = (
-            nworld_state[:, 0, :].unsqueeze(1).repeat(1, self.robot_state_len, 1)
+            nworld_state[:, 0, :].unsqueeze(1).repeat(1, Tr, 1)
             - robot_state[:, :, :3]
         )
 
         # Add noise to positive samples
-        batch_size = naction.size(0)
         action_noise = torch.normal(
             mean=0,
             std=1e-4,
@@ -147,7 +142,6 @@ class ImplicitPolicy(BasePolicy):
         ground_truth = (permutation == 0).nonzero()[:, 1].to(naction.device)
 
         energy = self.forward(robot_state, world_state, targets)
-        # logits = -1.0 * energy
         loss = F.cross_entropy(energy, ground_truth)
 
         return loss
