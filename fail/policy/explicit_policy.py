@@ -16,17 +16,17 @@ class ExplicitPolicy(BasePolicy):
     LOG_SIG_MIN = -20
     EPS = 1e-6
 
-    def __init__(self, action_dim, seq_len, z_dim, dropout):
-        super().__init__(action_dim, seq_len, z_dim)
+    def __init__(self, robot_state_dim, world_state_dim, action_dim, num_robot_state, num_world_state, num_action_steps, encoder):
+        super().__init__(robot_state_dim, world_state_dim, action_dim, num_robot_state, num_world_state, num_action_steps)
 
-        self.encoder = PoseForceEncoder(z_dim, seq_len, dropout)
+        self.encoder = encoder
+        z_dim = self.encoder.z_dim
         self.policy = MLP([z_dim, z_dim // 2, action_dim * 2], act_out=False)
 
         self.apply(torch_utils.init_weights)
 
-    def forward(self, x):
-        batch_size = x.size(0)
-        z = self.encoder(x)
+    def forward(self, robot_state, world_state):
+        z = self.encoder(robot_state, world_state)
         out = self.policy(z)
 
         mean = out[:, : self.action_dim]
@@ -34,8 +34,8 @@ class ExplicitPolicy(BasePolicy):
 
         return mean, log_std
 
-    def sample(self, x):
-        mean, log_std = self.forward(x)
+    def sample(self, robot_state, world_state):
+        mean, log_std = self.forward(robot_state, world_state)
         std = log_std.exp()
 
         normal = Normal(mean, std)
@@ -50,39 +50,47 @@ class ExplicitPolicy(BasePolicy):
 
         return action, log_prob, mean
 
-    def get_action(self, obs, goal, device):
-        ngoal = self.normalizer["goal"].normalize(goal)
-        nobs = self.normalizer["obs"].normalize(np.stack(obs))
-        hole_noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+    def get_action(self, obs, device):
+        B = obs['robot_state'].shape[0]
 
-        policy_obs = nobs.unsqueeze(0).flatten(1, 2)
-        # policy_obs = torch.concat((ngoal.view(1,1,3).repeat(1,20,1), policy_obs), dim=-1)
-        policy_obs[:, :, :3] = ngoal.view(1, 1, 3).repeat(1, self.seq_len, 1) - (
-            policy_obs[:, :, :3] + hole_noise
-        )
-        policy_obs = policy_obs.to(device)
+        nrobot_state = self.normalizer["robot_state"].normalize(obs['robot_state'])
+        nworld_state = self.normalizer["world_state"].normalize(obs['world_state'])
+
+        Dr = self.robot_state_dim
+        Dw = self.world_state_dim
+        Tr = self.num_robot_state
+        Tw = self.num_world_state
+        Ta = self.num_action_steps
 
         with torch.no_grad():
-            _, _, policy_action = self.sample(policy_obs)
-            policy_action = policy_action.cpu().squeeze().numpy()
-        action = self.normalizer["action"].unnormalize(policy_action).cpu()
+            _, _, action = self.sample(nrobot_state, nworld_state)
+        actions = self.normalizer["action"].unnormalize(actions)
 
-        return action
+        return {'action': actions}
 
     def compute_loss(self, batch):
         # Load batch
-        nobs = batch["obs"].float()
+        nrobot_state = batch["robot_state"].float()
+        nworld_state = batch['world_state'].float()
         naction = batch["action"].float()
-        ngoal = batch["goal"].float()
 
-        B = nobs.shape[0]
-        obs = nobs.flatten(1, 2)
-        # obs = torch.concat((ngoal[:,0,:].unsqueeze(1).repeat(1,20,1), obs), dim=-1)
-        obs[:, :, :3] = (
-            ngoal[:, 0, :].unsqueeze(1).repeat(1, self.seq_len, 1) - obs[:, :, :3]
-        )
+        Dr = self.robot_state_dim
+        Dw = self.world_state_dim
+        Tr = self.num_robot_state
+        Tw = self.num_world_state
+        Ta = self.num_action_steps
+        B = naction.shape[0]
 
-        mean, log_prob, pred_action = self.sample(obs)
-        loss = F.mse_loss(mean, naction[:, -1])
+        mean, log_prob, _ = self.sample(nrobot_state, nworld_state)
+        loss = F.mse_loss(mean, naction)
 
         return loss
+
+    def get_action_stats(self):
+        action_stats = self.normalizer['action'].get_output_stats()
+
+        repeated_stats = dict()
+        for key, valye in action_stas.items():
+            n_repeats = self.action_dim // value.shape[0]
+            repeated_stats[key] = value.repeat(n_repeats)
+        return repeated_stats

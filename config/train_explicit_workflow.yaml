@@ -1,24 +1,39 @@
 defaults:
   - _self_
-  - task: peg_insertion
+  - task: block_touching_object_state 
 
 name: train_explicit_policy
 _target_: fail.workflow.explicit_workflow.ExplicitWorkflow
 
-obs_dim: 0 
-action_dim: 3 
-task_name: 'peg_insertion'
+robot_state_dim: ${task.robot_state_dim} 
+world_state_dim: $task.world_state_dim}
+action_dim: ${task.action_dim} 
+task_name:  ${task.name}
 exp_name: 'default'
 
-obs_horizon: 2
-obs_key_points: 10
-n_action_steps: 1
+horizon: 2
+num_obs_steps: 2
+num_action_steps: 1
+z_dim: 1024
 
 policy:
   _target_: fail.policy.explicit_policy.ExplicitPolicy
+  obs_dim: ${obs_dim}
   action_dim: ${action_dim}
-  seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
-  z_dim: 256
+  num_obs_steps: ${num_obs_steps}
+  num_action_steps: ${num_action_steps}
+
+encoder:
+  _target_: fail.model.modules.RobotStateObjectPoseEncoder
+  robot_state_dim: ${task.robot_state_dim}
+  object_state_dim: ${task.object_state_dim}
+  robot_state_len: ${task.robot_state_len}
+  object_state_len: ${task.world_state_len}
+  model_dim: 32
+  trans_out_dim: 32
+  trans_layers: 4
+  trans_heads: 8
+  z_dim: ${z_dim}
   dropout: 0.1
 
 dataloader:
@@ -48,18 +63,28 @@ training:
   resume: True
   lr_warmup_steps: 500
   num_epochs: 1000
-  checkpoint_every: 10
+  checkpoint_every: 50
+  rollout_every: 50
   val_every: 1
   tqdm_interval_sec: 1.0
 
 logging:
-  project: peg_insertion
+  project: ${task_name} 
   resume: True
   mode: online
   name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
   tags: ["${name}", "${task_name}", "${exp_name}"]
   id: null
   group: null
+
+checkpoint:
+  topk:
+    monitor_key: tast_mean_score
+    mode: max
+    k: 5
+    format_str: 'epoch={epoch:04d}-test_mean_score={test_mean_score:.3f}.ckpt'
+  save_last_checkpoint=True
+  save_last_snapshot=False
 
 multi_run:
   run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
