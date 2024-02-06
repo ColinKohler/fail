@@ -28,7 +28,15 @@ class ImplicitPolicy(BasePolicy):
         dropout: float,
         encoder: nn.Module,
     ):
-        super().__init__(robot_state_dim, world_state_dim, action_dim, num_robot_state, num_world_state, num_action_steps, z_dim)
+        super().__init__(
+            robot_state_dim,
+            world_state_dim,
+            action_dim,
+            num_robot_state,
+            num_world_state,
+            num_action_steps,
+            z_dim,
+        )
         self.num_neg_act_samples = num_neg_act_samples
         self.pred_n_iter = pred_n_iter
         self.pred_n_samples = pred_n_samples
@@ -46,12 +54,9 @@ class ImplicitPolicy(BasePolicy):
         z = self.encoder(robot_state, world_state)
 
         z_a = torch.cat(
-            [
-                z.unsqueeze(1).expand(-1, N, -1),
-                action.reshape(B, N, -1)
-            ],
-            dim=-1)
-        z_a.reshape(B*N, -1)
+            [z.unsqueeze(1).expand(-1, N, -1), action.reshape(B, N, -1)], dim=-1
+        )
+        z_a.reshape(B * N, -1)
 
         out = self.energy_mlp(z_a)
 
@@ -67,7 +72,9 @@ class ImplicitPolicy(BasePolicy):
         Tw = self.num_world_state
 
         robot_state = nrobot_state.unsqueeze(0).flatten(1, 2)
-        world_state = nworld_state.view(1, 1, 3).repeat(1, Tr, 1) - robot_state[:, :, :3]
+        world_state = (
+            nworld_state.view(1, 1, 3).repeat(1, Tr, 1) - robot_state[:, :, :3]
+        )
         robot_state = robot_state.to(device).float()
         world_state = world_state.to(device).float()
 
@@ -84,11 +91,11 @@ class ImplicitPolicy(BasePolicy):
             self,
             nobs,
             actions,
-            [action_stats['min'], action_stats['max']],
+            [action_stats["min"], action_stats["max"]],
         )
 
         actions = self.normalizer["action"].unnormalize(actions)
-        return {'action': actions}
+        return {"action": actions}
 
     def compute_loss(self, batch):
         # Load batch
@@ -102,16 +109,15 @@ class ImplicitPolicy(BasePolicy):
         Ta = self.num_action_steps
         B = nrobot_state.shape[0]
 
-        nrobot_state[:,:Tr]
-        nworld_state[:,:Tw]
+        nrobot_state[:, :Tr]
+        nworld_state[:, :Tw]
         start = 1
         end = start + Ta
-        naction = naction[:,start:end]
+        naction = naction[:, start:end]
 
         robot_state = nrobot_state.flatten(1, 2)
         world_state = (
-            nworld_state[:, 0, :].unsqueeze(1).repeat(1, Tr, 1)
-            - robot_state[:, :, :3]
+            nworld_state[:, 0, :].unsqueeze(1).repeat(1, Tr, 1) - robot_state[:, :, :3]
         )
 
         # Add noise to positive samples

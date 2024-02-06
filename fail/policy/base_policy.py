@@ -3,7 +3,9 @@ from fail.utils.normalizer import LinearNormalizer
 
 
 class BasePolicy(ModuleAttrMixin):
-    def __init__(self, action_dim, num_action_steps, robot_state_len, world_state_len, z_dim):
+    def __init__(
+        self, action_dim, num_action_steps, robot_state_len, world_state_len, z_dim
+    ):
         super().__init__()
 
         self.action_dim = action_dim

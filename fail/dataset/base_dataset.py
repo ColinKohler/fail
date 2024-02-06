@@ -32,9 +32,7 @@ class BaseDataset(torch.utils.data.Dataset):
         )
         self.train_mask = ~val_mask
         self.train_mask = downsample_mask(
-            mask=self.train_mask,
-            max_n=max_train_episodes,
-            seed=seed
+            mask=self.train_mask, max_n=max_train_episodes, seed=seed
         )
 
         self.sampler = SequenceSampler(

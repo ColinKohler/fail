@@ -1,5 +1,6 @@
 import torch
 
+
 def iterative_dfo(
     policy,
     obs,
@@ -9,7 +10,7 @@ def iterative_dfo(
     num_iterations=3,
     iteration_std=0.33,
 ):
-    """ DFO MCMC  """
+    """DFO MCMC"""
     device = obs.device
     B = actions.size(0)
     num_actions = actions.size(1)
@@ -35,6 +36,7 @@ def iterative_dfo(
 
     return probs, actions
 
+
 def langevin_actions(
     policy,
     obs,
@@ -51,7 +53,7 @@ def langevin_actions(
     sampler_stepsize_final=1e-5,
     sampler_stepsize_power=2.0,
 ):
-    """ Langevin MCMC  """
+    """Langevin MCMC"""
     B = actions.size(0)
     stepsize = sampler_stepsize_init
 
@@ -61,13 +63,10 @@ def langevin_actions(
             sampler_stepsize_init,
             sampler_stepsize_final,
             sampler_stepsize_power,
-            num_iterations
+            num_iterations,
         )
     else:
-        scheduler = ExponentialScheduler(
-            sampler_stepsize_init,
-            sampler_stepesize_decay
-        )
+        scheduler = ExponentialScheduler(sampler_stepsize_init, sampler_stepesize_decay)
 
     # Langevin step updates
     zero = torch.tensor(0, device=policy.device)
@@ -75,12 +74,7 @@ def langevin_actions(
     for step in range(num_iterations):
         langevin_lambda = 1.0
 
-        de_dact, energy = gradient_wrt_action(
-            policy,
-            obs,
-            actions,
-            apply_exp
-        )
+        de_dact, energy = gradient_wrt_action(policy, obs, actions, apply_exp)
 
         if grad_clip is not None:
             de_dact = torch.clamp(de_dact, -grad_clip, grad_clip)
@@ -88,10 +82,15 @@ def langevin_actions(
         gradient_scale = 0.5
         de_dact = gradient_scale * langevin_lambda * de_dact
         de_dact += torch.normal(
-            zero, langevin_lambda * noise_scale, size=de_dact.shape, device=de_dact.device
+            zero,
+            langevin_lambda * noise_scale,
+            size=de_dact.shape,
+            device=de_dact.device,
         )
         delta_actions = stepsize * de_dact
-        delta_actions = torch.clamp(delta_actions, -delta_action_clip, delta_action_clip)
+        delta_actions = torch.clamp(
+            delta_actions, -delta_action_clip, delta_action_clip
+        )
 
         actions = actions - delta_actions
         actions = torch.clamp(actions, action_dist[0], action_dist[1])
@@ -106,6 +105,7 @@ def langevin_actions(
 
     return probs, actions
 
+
 def gradient_wrt_action(policy, obs, actions, apply_exp):
     actions.requires_grad_()
     energy = policy.forward(obs, actions)
@@ -118,6 +118,7 @@ def gradient_wrt_action(policy, obs, actions, apply_exp):
 
     return de_dact.detach(), energy
 
+
 class PolynomialScheduler(object):
     def __init__(self, init, final, power, num_steps):
         self.init = init
@@ -126,9 +127,11 @@ class PolynomialScheduler(object):
         self.num_steps = num_steps
 
     def get_rate(self, step):
-        return ((self.init - self.final) *
-                ((1 - (float(step) / float(self.num_steps-1))) ** (self.power))
-               ) + self.final
+        return (
+            (self.init - self.final)
+            * ((1 - (float(step) / float(self.num_steps - 1))) ** (self.power))
+        ) + self.final
+
 
 class ExponentialScheduler(object):
     def __init__(self, init, decay):

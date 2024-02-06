@@ -10,7 +10,8 @@ def convert_action_to_harmonics(action):
     theta = np.arctan2(action[:, 1], (action[:, 0]))
     theta[np.where(theta < 0)] += 2 * np.pi
 
-    return np.concatenate((r[:,None], theta[:,None]), axis=1)
+    return np.concatenate((r[:, None], theta[:, None]), axis=1)
+
 
 def convert_harmonics_to_action(harmonics):
     pass
@@ -1870,4 +1871,4 @@ def plot_energy_circle(E):
     ax.grid(True)
 
     ax.set_title("Energy", va="bottom")
-    plt.savefig('test.png')
+    plt.savefig("test.png")

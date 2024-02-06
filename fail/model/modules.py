@@ -146,7 +146,9 @@ class SO2RobotStateObjectPoseEncoder(nn.Module):
         self.robot_state_type = robot_state_type
         self.object_state_type = object_state_type
         self.model_type = enn.FieldType(self.gspace, [t] * model_dim)
-        self.trans_out_type = enn.FieldType(self.gspace, [t] * trans_out_dim * robot_state_len)
+        self.trans_out_type = enn.FieldType(
+            self.gspace, [t] * trans_out_dim * robot_state_len
+        )
 
         self.robot_embedding = enn.SequentialModule(
             enn.FieldDropout(self.robot_state_type, dropout),
