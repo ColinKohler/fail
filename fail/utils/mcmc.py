@@ -3,7 +3,8 @@ import torch
 
 def iterative_dfo(
     policy,
-    obs,
+    robot_state,
+    world_state,
     actions,
     action_dist,
     temp=1.0,
@@ -11,14 +12,14 @@ def iterative_dfo(
     iteration_std=0.33,
 ):
     """DFO MCMC"""
-    device = obs.device
+    device = robot_state.device
     B = actions.size(0)
     num_actions = actions.size(1)
     zero = torch.tensor(0, device=device)
     resample_std = torch.tensor(iteration_std, device=device)
 
     for i in range(num_iterations):
-        logits = policy.forward(obs, actions)
+        logits = policy.forward(robot_state, world_state, actions)
         log_probs = logits / temp
         probs = torch.softmax(logits, dim=-1)
 

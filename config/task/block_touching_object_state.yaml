@@ -5,12 +5,12 @@ world_state_dim: 3
 action_dim: 2
 
 env_runner: 
-  _target_:  fail.env_runner.block_touching_object_state.BlockTouchingObjectStateRunner
-  num_train: 6
-  num_train_vis: 2
+  _target_:  fail.env_runner.block_touching_object_state_runner.BlockTouchingObjectStateRunner
+  num_train: 0
+  num_train_vis: 0
   train_start_seed: 0
-  num_test: 50
-  num_test_vis: 4
+  num_test: 1
+  num_test_vis: 1
   test_start_seed: 100000
   max_steps: 350
   num_obs_steps: ${num_obs_steps}
@@ -23,7 +23,7 @@ env_runner:
 dataset:
   _target_: fail.dataset.object_state_dataset.ObjectStateDataset
   path: data/block_touching_100
-  horizon: ${horizon}
+  horizon: ${num_obs_steps}
   pad_before: ${eval:'${num_obs_steps}-1'}
   pad_after: ${eval:'${num_action_steps}-1'}
   seed: 0

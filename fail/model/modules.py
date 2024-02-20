@@ -8,7 +8,6 @@ from escnn import group
 
 from fail.model.layers import SO2MLP, MLP, ResNet
 
-# from fail.model.transformer import Transformer
 from fail.model.general_transformer import Transformer
 from fail.model.so2_transformer import SO2Transformer
 from fail.utils.normalizer import LinearNormalizer
@@ -73,7 +72,7 @@ class RobotStateObjectPoseEncoder(nn.Module):
             num_layers=trans_layers,
             dropout=dropout,
         )
-        self.out = nn.Linear(robot_state_len * trans_out_dim, z_dim)
+        self.out = nn.Linear(object_state_len * trans_out_dim, z_dim)
 
     def forward(self, robot_state, object_state) -> torch.Tensor:
         batch_size = robot_state.size(0)

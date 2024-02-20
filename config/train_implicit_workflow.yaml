@@ -6,20 +6,19 @@ name: train_implicit_policy
 _target_: fail.workflow.implicit_workflow.ImplicitWorkflow
 
 robot_state_dim: ${task.robot_state_dim}
-world_state_dim: ${task.object_state_dim}
+world_state_dim: ${task.world_state_dim}
 action_dim: ${task.action_dim}
 task_name: ${task.name}
 exp_name: 'default'
-num_action_steps: 1
 is_harmonic: False
+past_action_visible: False
 
 num_action_steps: 1
 num_obs_steps: 2
-robot_state_step_len: 10
+num_robot_state_step: 10
 num_robot_state: ${eval:'${num_obs_steps}*${num_robot_state_step}'}
-num_world_state: ${task.num_world_state}
-z_dim: ${task.z_dim}
-encoder: ${task.encoder}
+num_world_state: ${num_obs_steps}
+z_dim: 256 
 
 policy:
   _target_: fail.policy.implicit_policy.ImplicitPolicy
@@ -29,10 +28,23 @@ policy:
   num_action_steps: ${num_action_steps}
   num_robot_state: ${num_robot_state}
   num_world_state: ${num_world_state}
-  z_dim: ${z_dim}
   num_neg_act_samples: 256
   pred_n_iter: 3
   pred_n_samples: 4096
+  z_dim: ${z_dim}
+  dropout: 0.1
+
+encoder:
+  _target_: fail.model.modules.RobotStateObjectPoseEncoder
+  robot_state_dim: ${robot_state_dim}
+  object_state_dim: ${world_state_dim}
+  robot_state_len: ${num_robot_state}
+  object_state_len: ${num_world_state}
+  model_dim: 64
+  trans_out_dim: 32
+  trans_layers: 4
+  trans_heads: 8
+  z_dim: ${z_dim}
   dropout: 0.1
 
 dataloader:
@@ -62,7 +74,8 @@ training:
   resume: True
   lr_warmup_steps: 500
   num_epochs: 1000
-  checkpoint_every: 100
+  checkpoint_every: 50
+  rollout_every: 50
   val_every: 1
   tqdm_interval_sec: 1.0
 

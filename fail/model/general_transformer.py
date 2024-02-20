@@ -67,6 +67,7 @@ class MultiheadAttention(nn.Module):
 
     def forward(self, x, key=None, mask=None, return_attention=False):
         batch_size, seq_len, embed_dim = x.size()  # [B, S, D]
+        q_len = key.shape[1] if key is not None else seq_len
 
         v = self.v_proj(x)
         k = self.k_proj(x)
@@ -77,12 +78,12 @@ class MultiheadAttention(nn.Module):
         v = v.permute(0, 2, 1, 3)  # [B, H, S, D]
         k = k.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
         k = k.permute(0, 2, 1, 3)  # [B, H, S, D]
-        q = q.reshape(batch_size, seq_len, self.num_heads, self.head_dim)
+        q = q.reshape(batch_size, q_len, self.num_heads, self.head_dim)
         q = q.permute(0, 2, 1, 3)  # [B, H, S, D]
 
         values, attention = scaledDotProduct(q, k, v, mask=mask)
         values = values.permute(0, 2, 1, 3)  # [B, S, H. D]
-        values = values.reshape(batch_size, seq_len, embed_dim)
+        values = values.reshape(batch_size, q_len, embed_dim)
         o = self.o_proj(values)
 
         if return_attention:
@@ -108,7 +109,7 @@ class EncoderBlock(nn.Module):
 
     def forward(self, x, key=None, mask=None):
         attn_out = self.attn(x, key=key, mask=mask)
-        x = x + self.dropout(attn_out)
+        x = key + self.dropout(attn_out)
         x = self.norm1(x)
         x = x + self.dropout(self.mlp(x))
         x = self.norm2(x)

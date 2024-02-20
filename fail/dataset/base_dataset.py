@@ -7,7 +7,7 @@ import pickle
 from fail.dataset.replay_buffer import ReplayBuffer
 from fail.utils import torch_utils
 from fail.utils.normalizer import LinearNormalizer
-from fail.utils.sampler import SequenceSampler, get_val_mask
+from fail.utils.sampler import SequenceSampler, get_val_mask, downsample_mask
 
 
 class BaseDataset(torch.utils.data.Dataset):

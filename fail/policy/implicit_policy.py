@@ -35,7 +35,6 @@ class ImplicitPolicy(BasePolicy):
             num_robot_state,
             num_world_state,
             num_action_steps,
-            z_dim,
         )
         self.num_neg_act_samples = num_neg_act_samples
         self.pred_n_iter = pred_n_iter
@@ -71,25 +70,26 @@ class ImplicitPolicy(BasePolicy):
         Tr = self.num_robot_state
         Tw = self.num_world_state
 
-        robot_state = nrobot_state.unsqueeze(0).flatten(1, 2)
-        world_state = (
-            nworld_state.view(1, 1, 3).repeat(1, Tr, 1) - robot_state[:, :, :3]
-        )
-        robot_state = robot_state.to(device).float()
-        world_state = world_state.to(device).float()
+        nrobot_state = nrobot_state.view(1, 20, 9)
+        nworld_state = nworld_state.view(1, 2, 3)
+        #nrobot_state = nrobot_state.unsqueeze(0).flatten(1, 2)
+        #nworld_state = nworld_state.unsqueeze(0).flatten(1,2)
+        nrobot_state = nrobot_state.to(device).float()
+        nworld_state = nworld_state.to(device).float()
 
         # Sample actions: (1, num_samples, Da)
         action_stats = self.get_action_stats()
         action_dist = torch.distributions.Uniform(
             low=action_stats["min"], high=action_stats["max"]
         )
-        samples = action_dist.sample((B, self.pred_n_samples, T)).to(
+        actions = action_dist.sample((B, self.pred_n_samples, Ta)).to(
             dtype=robot_state.dtype
         )
 
         action_probs, actions = mcmc.iterative_dfo(
             self,
-            nobs,
+            nrobot_state,
+            nworld_state,
             actions,
             [action_stats["min"], action_stats["max"]],
         )
@@ -116,9 +116,7 @@ class ImplicitPolicy(BasePolicy):
         naction = naction[:, start:end]
 
         robot_state = nrobot_state.flatten(1, 2)
-        world_state = (
-            nworld_state[:, 0, :].unsqueeze(1).repeat(1, Tr, 1) - robot_state[:, :, :3]
-        )
+        world_state = nworld_state.view(B, 2, -1)
 
         # Add noise to positive samples
         action_noise = torch.normal(
@@ -135,7 +133,7 @@ class ImplicitPolicy(BasePolicy):
         action_dist = torch.distributions.Uniform(
             low=action_stats["min"], high=action_stats["max"]
         )
-        negatives = action_dist.sample((batch_size, self.num_neg_act_samples, Ta)).to(
+        negatives = action_dist.sample((B, self.num_neg_act_samples, Ta)).to(
             dtype=naction.dtype
         )
 

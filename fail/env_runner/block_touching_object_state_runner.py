@@ -19,7 +19,7 @@ from fail.utils.torch_utils import dict_apply
 from fail.env_runner.base_runner import BaseRunner
 
 
-class BlockTouchingRunner(BaseRunner):
+class BlockTouchingObjectStateRunner(BaseRunner):
     def __init__(
         self,
         output_dir,
@@ -36,7 +36,6 @@ class BlockTouchingRunner(BaseRunner):
         crf=22,
         past_action=False,
         abs_action=False,
-        obs_eef_target=True,
         tqdm_interval_sec=5.0,
         num_envs=None,
     ):
@@ -140,7 +139,6 @@ class BlockTouchingRunner(BaseRunner):
         self.past_action = past_action
         self.max_steps = max_steps
         self.tqdm_interval_sec = tqdm_interval_sec
-        self.obs_eef_target = obs_eef_target
 
     def run(self, policy: BasePolicy):
         device = policy.device
@@ -155,7 +153,7 @@ class BlockTouchingRunner(BaseRunner):
         # allocate data
         all_video_paths = [None] * num_inits
         all_rewards = [None] * num_inits
-        last_info = [None] * num_inits
+        #last_info = [None] * num_inits
 
         for chunk_idx in range(num_chunks):
             start = chunk_idx * num_envs
@@ -186,10 +184,12 @@ class BlockTouchingRunner(BaseRunner):
             )
             done = False
             while not done:
+                obs = obs.astype(np.float32)
                 # create obs dict
-                if not self.obs_eef_target:
-                    obs[..., 8:10] = 0
-                np_obs_dict = {"obs": obs.astype(np.float32)}
+                np_obs_dict = {
+                    'robot_state' : obs[:,:,:90],
+                    'world_state' : obs[:,:,90:]
+                }
                 if self.past_action and (past_action is not None):
                     # TODO: not tested
                     np_obs_dict["past_action"] = past_action[
@@ -202,7 +202,7 @@ class BlockTouchingRunner(BaseRunner):
 
                 # run policy
                 with torch.no_grad():
-                    action_dict = policy.get_action(obs_dict, device)
+                    action_dict = policy.get_action(obs_dict['robot_state'], obs_dict['world_state'], device)
 
                 # device_transfer
                 np_action_dict = dict_apply(
@@ -212,7 +212,7 @@ class BlockTouchingRunner(BaseRunner):
                 action = np_action_dict["action"]
 
                 # step env
-                obs, reward, done, info = env.step(action)
+                obs, reward, done, _ = env.step(action)
                 done = np.all(done)
                 past_action = action
 
@@ -225,9 +225,9 @@ class BlockTouchingRunner(BaseRunner):
             all_rewards[this_global_slice] = env.call("get_attr", "reward")[
                 this_local_slice
             ]
-            last_info[this_global_slice] = [
-                dict((k, v[-1]) for k, v in x.items()) for x in info
-            ][this_local_slice]
+            #last_info[this_global_slice] = [
+            #    dict((k, v[-1]) for k, v in x.items()) for x in info
+            #][this_local_slice]
 
         # log
         total_rewards = collections.defaultdict(list)
@@ -248,9 +248,9 @@ class BlockTouchingRunner(BaseRunner):
 
             # aggregate event counts
             prefix_counts[prefix] += 1
-            for key, value in last_info[i].items():
-                delta_count = 1 if value > 0 else 0
-                prefix_event_counts[prefix][key] += delta_count
+            #for key, value in last_info[i].items():
+            #    delta_count = 1 if value > 0 else 0
+            #    prefix_event_counts[prefix][key] += delta_count
 
             # visualize sim
             video_path = all_video_paths[i]

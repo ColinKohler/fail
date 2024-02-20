@@ -76,8 +76,8 @@ class ImplicitWorkflow(BaseWorkflow):
         self.model.to(device)
 
         # Env runner
-        # env_runner: BaseRunner
-        # env_runner = hydra.utils.instantiate(self.config.task.env_runner, output_dir=self.output_dir)
+        env_runner: BaseRunner
+        env_runner = hydra.utils.instantiate(self.config.task.env_runner, output_dir=self.output_dir)
 
         # Setup logging
         wandb_run = wandb.init(
@@ -149,9 +149,9 @@ class ImplicitWorkflow(BaseWorkflow):
                 # Validation
                 self.model.eval()
 
-                # if self.epoch % self.config.training.rollout_every == 0:
-                #    runner_log = env_runner.run(self.model)
-                #    step_log.update(runner_log)
+                if self.epoch % self.config.training.rollout_every == 0:
+                    runner_log = env_runner.run(self.model)
+                    step_log.update(runner_log)
 
                 if self.epoch % self.config.training.val_every == 0:
                     val_losses = list()
