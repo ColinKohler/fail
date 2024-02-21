@@ -1,11 +1,11 @@
-name: block_touching_object_state
+name: block_pushing_object_state
 
 robot_state_dim: 9
 world_state_dim: 3
 action_dim: 2
 
 env_runner: 
-  _target_:  fail.env_runner.block_touching_object_state_runner.BlockTouchingObjectStateRunner
+  _target_:  fail.env_runner.block_pushing_object_state_runner.BlockPushingObjectStateRunner
   num_train: 10
   num_train_vis: 2
   train_start_seed: 0
@@ -22,7 +22,7 @@ env_runner:
 
 dataset:
   _target_: fail.dataset.object_state_dataset.ObjectStateDataset
-  path: data/block_touching_100
+  path: data/block_pushing_100
   horizon: ${num_obs_steps}
   pad_before: ${eval:'${num_obs_steps}-1'}
   pad_after: ${eval:'${num_action_steps}-1'}
