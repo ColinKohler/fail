@@ -77,7 +77,9 @@ class ImplicitWorkflow(BaseWorkflow):
 
         # Env runner
         env_runner: BaseRunner
-        env_runner = hydra.utils.instantiate(self.config.task.env_runner, output_dir=self.output_dir)
+        env_runner = hydra.utils.instantiate(
+            self.config.task.env_runner, output_dir=self.output_dir
+        )
 
         # Setup logging
         wandb_run = wandb.init(

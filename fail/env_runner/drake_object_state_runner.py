@@ -7,7 +7,9 @@ import tqdm
 import dill
 import math
 import wandb.sdk.data_types.video as wv
+from fail.env.block_touching.block_touching import BlockTouching
 from fail.env.block_pushing.block_pushing import BlockPushing
+from fail.env.peg_insertion.peg_insertion import PegInsertion
 from fail.gym_util.async_vector_env import AsyncVectorEnv
 from fail.gym_util.sync_vector_env import SyncVectorEnv
 from fail.gym_util.multistep_wrapper import MultiStepWrapper
@@ -19,10 +21,11 @@ from fail.utils.torch_utils import dict_apply
 from fail.env_runner.base_runner import BaseRunner
 
 
-class BlockPushingObjectStateRunner(BaseRunner):
+class DrakeObjectStateRunner(BaseRunner):
     def __init__(
         self,
         output_dir,
+        env,
         num_train=10,
         num_train_vis=3,
         train_start_seed=0,
@@ -45,12 +48,19 @@ class BlockPushingObjectStateRunner(BaseRunner):
         task_fps = 10
         steps_per_render = max(10 // fps, 1)
 
+        if env == "block_touching":
+            env = BlockTouching
+        elif env == "block_pushing":
+            env = BlockPushing
+        elif env == "peg_insertion":
+            env = PegInsertion
+        else:
+            raise ValueError("Invalid Drake env specified.")
+
         def env_fn():
             return MultiStepWrapper(
                 VideoRecordingWrapper(
-                    FlattenObservation(
-                        BlockPushing()
-                    ),
+                    FlattenObservation(env()),
                     video_recoder=VideoRecorder.create_h264(
                         fps=fps,
                         codec="h264",
@@ -153,7 +163,7 @@ class BlockPushingObjectStateRunner(BaseRunner):
         # allocate data
         all_video_paths = [None] * num_inits
         all_rewards = [None] * num_inits
-        #last_info = [None] * num_inits
+        # last_info = [None] * num_inits
 
         for chunk_idx in range(num_chunks):
             start = chunk_idx * num_envs
@@ -178,7 +188,7 @@ class BlockPushingObjectStateRunner(BaseRunner):
 
             pbar = tqdm.tqdm(
                 total=self.max_steps,
-                desc=f"Eval BlockPushingRunner {chunk_idx+1}/{num_chunks}",
+                desc=f"Eval DrakeObjectStateRunner {chunk_idx+1}/{num_chunks}",
                 leave=False,
                 mininterval=self.tqdm_interval_sec,
             )
@@ -187,8 +197,8 @@ class BlockPushingObjectStateRunner(BaseRunner):
                 obs = obs.astype(np.float32)
                 # create obs dict
                 np_obs_dict = {
-                    'robot_state' : obs[:,:,:90],
-                    'world_state' : obs[:,:,90:]
+                    "robot_state": obs[:, :, :90],
+                    "world_state": obs[:, :, 90:],
                 }
                 if self.past_action and (past_action is not None):
                     # TODO: not tested
@@ -202,7 +212,9 @@ class BlockPushingObjectStateRunner(BaseRunner):
 
                 # run policy
                 with torch.no_grad():
-                    action_dict = policy.get_action(obs_dict['robot_state'], obs_dict['world_state'], device)
+                    action_dict = policy.get_action(
+                        obs_dict["robot_state"], obs_dict["world_state"], device
+                    )
 
                 # device_transfer
                 np_action_dict = dict_apply(
@@ -225,9 +237,9 @@ class BlockPushingObjectStateRunner(BaseRunner):
             all_rewards[this_global_slice] = env.call("get_attr", "reward")[
                 this_local_slice
             ]
-            #last_info[this_global_slice] = [
+            # last_info[this_global_slice] = [
             #    dict((k, v[-1]) for k, v in x.items()) for x in info
-            #][this_local_slice]
+            # ][this_local_slice]
 
         # log
         total_rewards = collections.defaultdict(list)
@@ -248,7 +260,7 @@ class BlockPushingObjectStateRunner(BaseRunner):
 
             # aggregate event counts
             prefix_counts[prefix] += 1
-            #for key, value in last_info[i].items():
+            # for key, value in last_info[i].items():
             #    delta_count = 1 if value > 0 else 0
             #    prefix_event_counts[prefix][key] += delta_count
 

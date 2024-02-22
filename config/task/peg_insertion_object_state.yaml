@@ -1,37 +1,26 @@
-name: peg_insertion
+name: peg_insertion_object_state
 
 robot_state_dim: 9
 object_state_dim: 3
-world_state_len: ${robot_state_len}
 action_dim: 3
-z_dim: 256
 
-encoder:
-  _target_: fail.model.modules.RobotStateObjectPoseEncoder
-  robot_state_dim: ${robot_state_dim}
-  object_state_dim: ${task.object_state_dim}
-  robot_state_len: ${robot_state_len}
-  object_state_len: ${world_state_len}
-  model_dim: 64
-  trans_out_dim: 32
-  trans_layers: 4
-  trans_heads: 8
-  z_dim: ${z_dim}
-  dropout: 0.1
+env_runner: 
+  _target_:  fail.env_runner.drake_object_state_runner.DrakeObjectStateRunner
+  env:peg_insertion 
+  num_train: 10
+  num_train_vis: 2
+  train_start_seed: 0
+  num_test: 50
+  num_test_vis: 10
+  test_start_seed: 100000
+  max_steps: 100
+  num_obs_steps: ${num_obs_steps}
+  num_action_steps: ${num_action_steps}
+  fps: 5
+  past_action: ${past_action_visible}
+  abs_action: False
+  num_envs: null
 
-so2_encoder:
-  _target_: fail.model.modules.SO2RobotStateObjectPoseEncoder
-  robot_state_dim: ${robot_state_dim}
-  object_state_dim: ${task.object_state_dim}
-  robot_state_len: ${robot_state_len}
-  object_state_len: ${world_state_len}
-  model_dim: 64
-  trans_out_dim: 32
-  trans_layers: 4
-  trans_heads: 8
-  L: 3
-  z_dim: ${z_dim}
-  dropout: 0.1
 
 dataset:
   _target_: fail.dataset.object_state_dataset.ObjectStateDataset

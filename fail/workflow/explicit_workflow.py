@@ -76,7 +76,9 @@ class ExplicitWorkflow(BaseWorkflow):
 
         # Env runner
         env_runner: BaseRunner
-        env_runner = hydra.instantiate(self.config.task.env_runner, output_dir=self.output_dir)
+        env_runner = hydra.instantiate(
+            self.config.task.env_runner, output_dir=self.output_dir
+        )
 
         # Setup logging
         wandb_run = wandb.init(
@@ -93,8 +95,8 @@ class ExplicitWorkflow(BaseWorkflow):
 
         # Checkpointer
         topk_manager = TopKCheckpointManager(
-            save_dir=os.path.join(self.output_dir, 'checkpoints'),
-            **self.config.checkpoint.topk
+            save_dir=os.path.join(self.output_dir, "checkpoints"),
+            **self.config.checkpoint.topk,
         )
 
         # Training
@@ -180,7 +182,7 @@ class ExplicitWorkflow(BaseWorkflow):
 
                     metric_dict = dict()
                     for k, v in step_log.items():
-                        metric_dict[k.replace('/', '_')] = v
+                        metric_dict[k.replace("/", "_")] = v
                         topk_checkpoint_path = topk_manager.get_ckpt_path(metric_dict)
                         if topk_checkpoint_path is not None:
                             self.save_checkpoint(path=topk_checkpoint_path)

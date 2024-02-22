@@ -2,13 +2,11 @@ import os
 import copy
 import numpy as np
 import numpy.random as npr
-import gym
-from gym.envs import registration
+import gymnasium as gym
 from pathlib import Path
 from functools import partial
 import pydot
 from spatialmath.base import q2r
-import collections
 from collections import deque
 from scipy.signal import butter, filtfilt
 
@@ -69,8 +67,8 @@ from pydrake.solvers import Solve
 from pydrake.common import FindResourceOrThrow
 from pydrake.common.value import AbstractValue
 
-from fail.env.drake_env.base_env import BaseEnv
-from fail.env.drake_env.named_view_helpers import (
+from drake_ws.peg_insertion_envs.base_env import BaseEnv
+from drake_ws.peg_insertion_envs.named_view_helpers import (
     MakeNamedViewBodyPoses,
     MakeNamedViewForces,
 )
@@ -84,7 +82,7 @@ SIM_TIME_STEP = 0.001  # 1kHz
 GYM_TIME_STEP = 0.1  # 10Hz
 CONTROLLER_TIME_STEP = 0.001  # 1kHz
 STATE_TIME_STEP = 0.01
-GYM_TIME_LIMIT = 5
+GYM_TIME_LIMIT = 10
 CONTACT_MODEL = "hydroelastic_with_fallback"
 CONTACT_SOLVER = "sap"  #'tamsi'
 HOME_Q = np.array([0, 0, 0, -np.pi / 2, 0, np.pi / 2, np.pi / 4])
@@ -105,22 +103,21 @@ class ObservationPublisher(LeafSystem):
             "forces", AbstractValue.Make([SpatialForce()])
         )
 
-        self.DeclareVectorOutputPort("world_state", 3, self.getWorldState)
+        self.DeclareVectorOutputPort("goal_observation", 3, self.getGoalObs)
         self.DeclareVectorOutputPort(
-            "robot_state", 9 * self.state_len, self.getRobotState
+            "state_observation", 9 * self.state_len, self.getStateObs
         )
 
         self.DeclarePeriodicDiscreteUpdateEvent(
             period_sec=STATE_TIME_STEP,
             offset_sec=STATE_TIME_STEP,
-            update=self.robotStateUpdate,
+            update=self.stateUpdate,
         )
 
         self.inital_force = None
-        self.force_history = list()
-        self.pose_history = list()
+        self.state_history = list()
 
-    def robotStateUpdate(self, context, discrete_state):
+    def stateUpdate(self, context, discrete_state):
         poses = self.pose_view(self.poses_port.Eval(context))
         hand_force = self.joint_view(self.force_port.Eval(context)).panda_hand_joint
         hand_T_world = poses.panda_hand.inverse()
@@ -133,24 +130,30 @@ class ObservationPublisher(LeafSystem):
 
         robot_T_world = poses.panda_link0.inverse()
         world_T_peg = poses.peg_base_link
+        world_T_hole = poses.peg_hole_base_link
+
         robot_T_peg = robot_T_world.multiply(world_T_peg)
+        robot_T_hole = robot_T_world.multiply(world_T_hole)
 
         self.force_history.append(force)
         self.pose_history.append(robot_T_peg.translation())
 
-    def getWorldState(self, context, output):
+    def getGoalObs(self, context, output):
         poses = self.pose_view(self.poses_port.Eval(context))
         robot_T_world = poses.panda_link0.inverse()
-        world_T_block = poses.block_link
-        robot_T_block = robot_T_world.multiply(world_T_block)
+        world_T_hole = poses.peg_hole_base_link
+        robot_T_hole = robot_T_world.multiply(world_T_hole)
 
-        output.set_value(robot_T_block.translation())
+        output.set_value(robot_T_hole.translation())
 
-    def getRobotState(self, context, output):
+    def getStateObs(self, context, output):
         poses = self.pose_view(self.poses_port.Eval(context))
         robot_T_world = poses.panda_link0.inverse()
         world_T_peg = poses.peg_base_link
+        world_T_hole = poses.peg_hole_base_link
+
         robot_T_peg = robot_T_world.multiply(world_T_peg)
+        robot_T_hole = robot_T_world.multiply(world_T_hole)
 
         time = context.get_time()
         if time == 0:
@@ -158,13 +161,12 @@ class ObservationPublisher(LeafSystem):
             pose = np.array([robot_T_peg.translation()] * self.state_len)
 
             self.initial_force = None
-            self.force_history = [[0] * 6]
-            self.pose_history = [pose.tolist()]
+            self.force_history = [[0] * 6] * self.state_len
+            self.pose_history = pose.tolist()
         else:
             pose = np.array(self.pose_history[-self.state_len :])
             force = np.array(self.force_history[-self.state_len :])
 
-        # Low-pass filter on force data
         fs = 100  # Sample rate (Hz)
         cutoff = 10 / (0.5 * fs)
         b, a = butter(1, cutoff, btype="low", analog=False)
@@ -213,33 +215,31 @@ class RewardSystem(LeafSystem):
         super().__init__()
 
         self.pose_view = pose_view
-        self.goal_pose = None
         self.input_port = self.DeclareAbstractInputPort(
             "poses", AbstractValue.Make([RigidTransform()])
         )
         self.DeclareVectorOutputPort("reward", 1, self.getReward)
-
-    def setGoal(self, goal_pose):
-        self.goal_pose = goal_pose
 
     def getReward(self, context, output):
         poses = self.pose_view(self.EvalAbstractInput(context, 0).get_value())
 
         robot_T_world = poses.panda_link0.inverse()
         world_T_peg = poses.peg_insertion_link
-        world_T_block = poses.block_link
-        robot_T_block = robot_T_world.multiply(world_T_block)
+        world_T_hole = poses.peg_hole_base_link
+
         robot_T_peg = robot_T_world.multiply(world_T_peg)
+        robot_T_hole = robot_T_world.multiply(world_T_hole)
 
         peg_xyz = copy.copy(robot_T_peg.translation())
-        block_xyz = copy.copy(robot_T_block.translation())
+        peg_xyz[2] -= 0.1  # TODO: Define this offset as the peg insertion height
+        hole_xyz = copy.copy(robot_T_hole.translation())
 
-        reward = np.allclose(block_xyz[:2], self.goal_pose, atol=2e-2)
+        reward = np.allclose(hole_xyz, peg_xyz, atol=5e-3)
 
         output[0] = reward
 
 
-class BlockPushingSim(object):
+class PegInsertionEnv(object):
     def __init__(self, meshcat=None, time_limit=5, debug=False):
         self.time_limit = time_limit
 
@@ -257,7 +257,6 @@ class BlockPushingSim(object):
             "renderer", MakeRenderEngineVtk(RenderEngineVtkParams())
         )
         self.trajopt = TrajectoryOptimization(debug=False)
-        self.goal = None
 
         # Init drake scene
         self.initScene()
@@ -290,15 +289,7 @@ class BlockPushingSim(object):
         parser.SetAutoRenaming(True)
 
         # Add assets to the plant
-        ws_path = (
-            Path(os.environ["BDAI"])
-            / "projects"
-            / "_experimental"
-            / "fail"
-            / "fail"
-            / "env"
-            / "drake_env"
-        )
+        ws_path = Path(os.environ["BDAI"]) / "projects" / "_experimental" / "drake_ws"
         self.panda_file = FindResourceOrThrow(
             "drake/manipulation/models/franka_description/urdf/panda_arm_hand.urdf"
         )
@@ -306,8 +297,9 @@ class BlockPushingSim(object):
         peg = parser.AddModels(
             str(ws_path / "models/peg_insertion/round_peg/Peg.urdf")
         )[0]
-        block = parser.AddModels(str(ws_path / "models/block.sdf"))[0]
-        goal_marker = parser.AddModels(str(ws_path / "models/goal_marker.sdf"))[0]
+        hole_id = parser.AddModels(
+            str(ws_path / "models/peg_insertion/round_peg/fixture/Hole.urdf")
+        )[0]
 
         # Build manipulator station setup
         robot, static_scene_shapes = get_station("cherry")
@@ -353,11 +345,11 @@ class BlockPushingSim(object):
         core = RenderCameraCore(
             "renderer", intrinsics, ClippingRange(0.01, 10.0), RigidTransform()
         )
-        color_cam = ColorRenderCamera(core, show_window=True)
+        color_cam = ColorRenderCamera(core, show_window=False)
         depth_cam = DepthRenderCamera(core, DepthRange(0.01, 10.0))
 
         world_T_sensor = RigidTransform(
-            RollPitchYaw([(4 / 16) * np.pi, np.pi, -np.pi / 2]), p=[1.0, -0.45, 2.0]
+            RollPitchYaw([(7 / 8) * -np.pi, 0, np.pi / 2]), p=[0.5, 0.45, 1.65]
         )
         self.rgbd_sensor = RgbdSensor(
             self.plant.GetBodyFrameIdOrThrow(self.plant.world_body().index()),
@@ -370,6 +362,19 @@ class BlockPushingSim(object):
         self.builder.Connect(
             self.scene_graph.get_query_output_port(),
             self.rgbd_sensor.query_object_input_port(),
+        )
+
+        # Fix peg hole on table into robot base frame
+        hole_base = self.plant.AddFrame(
+            frame=FixedOffsetFrame(
+                name="peg_hole_base",
+                P=self.plant.GetFrameByName("panda_link0"),
+                X_PF=RigidTransform(),
+                model_instance=None,
+            )
+        )
+        self.plant.WeldFrames(
+            hole_base, self.plant.GetFrameByName("peg_hole_base_link"), RigidTransform()
         )
 
         # Fix peg into gripper frame
@@ -435,57 +440,42 @@ class BlockPushingSim(object):
         self.builder.Connect(
             self.plant.get_reaction_forces_output_port(), obs_pub.GetInputPort("forces")
         )
-        self.builder.ExportOutput(obs_pub.GetOutputPort("robot_state"), "robot_state")
-        self.builder.ExportOutput(obs_pub.GetOutputPort("world_state"), "world_state")
         self.builder.ExportOutput(
-            self.rgbd_sensor.GetOutputPort("depth_image_32f"), "depth_observation"
+            obs_pub.GetOutputPort("state_observation"), "state_observation"
         )
         self.builder.ExportOutput(
-            self.rgbd_sensor.GetOutputPort("color_image"), "rgb_observation"
+            obs_pub.GetOutputPort("goal_observation"), "goal_observation"
         )
+        # self.builder.ExportOutput(self.rgbd_sensor.GetOutputPort('depth_image_32f'), 'depth_observations')
 
         # Reward system
-        self.reward = self.builder.AddSystem(RewardSystem(self.pose_view))
+        reward = self.builder.AddSystem(RewardSystem(self.pose_view))
         self.builder.Connect(
-            self.plant.GetOutputPort("body_poses"), self.reward.get_input_port(0)
+            self.plant.GetOutputPort("body_poses"), reward.get_input_port(0)
         )
-        self.builder.ExportOutput(self.reward.get_output_port(), "reward")
+        self.builder.ExportOutput(reward.get_output_port(), "reward")
 
-    def reset(self, diagram_context):
+    def reset(self, diagram_context, seed):
+        npr.seed(seed)
         plant_context = self.diagram.GetMutableSubsystemContext(
             self.plant, diagram_context
         )
-        seed = self._seed
-        rs = npr.RandomState(seed=seed)
-
-        self.goal = [rs.uniform(0.4, 0.65), rs.uniform(-0.1, 0.1)]
-        self.reward.setGoal(self.goal)
-
-        goal_body = self.plant.GetBodyByName("goal_marker_link")
-        robot_T_goal = RigidTransform(RollPitchYaw([0, 0, 0]), p=self.goal + [0.0])
-        world_T_goal = self.world_T_robot.multiply(robot_T_goal)
-        self.plant.SetFreeBodyPose(plant_context, goal_body, world_T_goal)
 
         q_sol = None
         while q_sol is None:
-            # Randomly sample poses for the block
-            block_pos = [rs.uniform(0.4, 0.65), rs.uniform(-0.1, 0.1), 0.025]
-            while np.allclose(block_pos[:2], self.goal, atol=5e-2):
-                block_pos = [rs.uniform(0.4, 0.65), rs.uniform(-0.1, 0.1), 0.025]
-            self.block_pos = block_pos
+            # Randomly sample poses for the hole and the initial gripper pose
+            hole_pose = RigidTransform(
+                RollPitchYaw([np.pi / 2, 0, 0]),
+                p=[npr.uniform(0.45, 0.55), npr.uniform(-0.05, 0.05), 0.0],
+            )
 
-            robot_T_block = RigidTransform(RollPitchYaw([np.pi / 2, 0, 0]), p=block_pos)
+            hole_frame = self.plant.GetFrameByName("peg_hole_base")
+            hole_frame.SetPoseInParentFrame(plant_context, X_PF=hole_pose)
 
-            block_body = self.plant.GetBodyByName("block_link")
-            world_T_block = self.world_T_robot.multiply(robot_T_block)
-            self.plant.SetFreeBodyPose(plant_context, block_body, world_T_block)
-
-            # TODO: Fix this mess w/choice causing z axis issues
-            peg_pos = [rs.uniform(0.4, 0.6), rs.uniform(-0.1, 0.1), 0.2]
-            while np.allclose(peg_pos[:2], block_pos[:2], atol=2e-2):
-                peg_pos = [rs.uniform(0.4, 0.6), rs.uniform(-0.1, 0.1), 0.2]
             robot_T_hand = RigidTransform(
-                RotationMatrix(q2r([0, 1, 0, 0])), p=peg_pos
+                RotationMatrix(q2r([0, 1, 0, 0])),
+                copy.copy(hole_pose.translation())
+                + npr.uniform([-0.05, -0.05, 0.275], [0.05, 0.05, 0.35]),
             ).GetAsMatrix4()
 
             # Solve IK and set panda to joint jositions
@@ -517,81 +507,71 @@ class BlockPushingSim(object):
         if context.get_time() > self.time_limit:
             return EventStatus.ReachedTermination(self.diagram, "time limit")
 
+        # Peg inserted into hole
         robot_T_world = poses.panda_link0.inverse()
         world_T_peg = poses.peg_insertion_link
-        world_T_block = poses.block_link
+        world_T_hole = poses.peg_hole_base_link
 
         robot_T_peg = robot_T_world.multiply(world_T_peg)
-        robot_T_block = robot_T_world.multiply(world_T_block)
+        robot_T_hole = robot_T_world.multiply(world_T_hole)
 
         peg_xyz = copy.copy(robot_T_peg.translation())
         peg_xyz[2] -= 0.1
-        block_xyz = copy.copy(robot_T_block.translation())
-        self.block_pos = block_xyz
+        hole_xyz = copy.copy(robot_T_hole.translation())
 
         in_bounds = [
-            (peg_xyz[0] > 0.3 and peg_xyz[0] < 0.7),
+            (peg_xyz[0] > 0.3 and peg_xyz[0] < 0.6),
             (peg_xyz[1] > -0.15 and peg_xyz[1] < 0.15),
-            (peg_xyz[2] > -0.05 and peg_xyz[2] < 0.26),
+            (peg_xyz[2] > 0.0 and peg_xyz[2] < 0.36),
         ]
         if not np.all(in_bounds):
             return EventStatus.ReachedTermination(
                 self.diagram, "Gripper outside workspace."
             )
 
-        if np.allclose(peg_xyz[:2], block_xyz[:2], atol=2e-2):
-            return EventStatus.ReachedTermination(self.diagram, "Peg reached block")
+        if np.allclose(hole_xyz, peg_xyz, atol=5e-3):
+            return EventStatus.ReachedTermination(
+                self.diagram, "Peg inserted into hole."
+            )
 
         return EventStatus.Succeeded()
 
 
-class BlockPushing(BaseEnv):
-    def __init__(self, meshcat=None, time_limit=GYM_TIME_LIMIT):
-        drake_sim = BlockPushingSim(meshcat=meshcat, time_limit=time_limit)
+def createPegInsertionEnv(meshcat=None, time_limit=GYM_TIME_LIMIT):
+    drake_sim = PegInsertionEnv(meshcat=meshcat, time_limit=time_limit)
 
-        # Define action space: (dx, dy)
-        na = 2
-        low_a = [-0.02] * na
-        high_a = [0.02] * na
-        action_space = gym.spaces.Box(
-            low=np.asarray(low_a, dtype="float32"),
-            high=np.asarray(high_a, dtype="float32"),
-            dtype=np.float32,
-        )
+    # Define action space: (dx, dy)
+    na = 3
+    low_a = [-0.02] * na
+    high_a = [0.02] * na
+    action_space = gym.spaces.Box(
+        low=np.asarray(low_a, dtype="float32"),
+        high=np.asarray(high_a, dtype="float32"),
+        dtype=np.float32,
+    )
 
-        # Define observation space: robot_state (Ex, Ey, Ez, Fx, Fy, Fz, Mx, My, Mz) + world_state (Bx, By, Bz, Gx, Gy, Gz)
-        ws_min = [0.4, -0.1, 0.0]
-        ws_max = [0.65, 0.1, 0.35]
-        force_min = [-10.0, -10.0, -10.0, -10.0, -10.0, -10.0]
-        force_max = [10.0, 10.0, 10.0, 10.0, 10.0, 10.0]
-        robot_state_min = (ws_min + force_min) * 10
-        robot_state_max = (ws_max + force_max) * 10
+    # Define observation space: Peg position (x, y, z) + Peg Hole (x, y, z) + Peg F/T (Fx, Fy, Mx, My)
+    pose_low = [0.4, -0.1, 0.0, 0.4, -0.1, 0.0] * 128
+    pose_high = [0.6, 0.1, 0.35, 0.6, 0.1, 0.35] * 128
+    force_low = [-10.0] * 6 * 128
+    force_high = [10.0] * 6 * 128
+    observation_spaces = [
+        gym.spaces.Box(
+            low=np.asarray(pose_low), high=np.asarray(pose_high), dtype=np.float32
+        ),
+        gym.spaces.Box(
+            low=np.asarray(force_low), high=np.asarray(force_high), dtype=np.float32
+        ),
+    ]
 
-        observation_space = collections.OrderedDict(
-            robot_state=gym.spaces.Box(
-                low=np.asarray(robot_state_min),
-                high=np.asarray(robot_state_max),
-            ),
-            world_state=gym.spaces.Box(
-                low=np.asarray(ws_min),
-                high=np.asarray(ws_max),
-            ),
-        )
-        observation_space = gym.spaces.Dict(observation_space)
+    env = BaseEnv(
+        drake_sim=drake_sim,
+        time_step=GYM_TIME_STEP,
+        action_space=action_space,
+        observation_spaces=observation_spaces,
+        reward="reward",
+        action_port_id="actions",
+        observation_port_ids=["state_observation"],
+    )
 
-        super().__init__(
-            drake_sim=drake_sim,
-            time_step=GYM_TIME_STEP,
-            action_space=action_space,
-            observation_space=observation_space,
-            reward="reward",
-            action_port_id="actions",
-            observation_port_ids=["robot_state", "world_state"],
-        )
-
-
-registration.register(
-    id="BlockPushing-v0",
-    entry_point=BlockPushing,
-    max_episode_steps=int(GYM_TIME_LIMIT / GYM_TIME_STEP),
-)
+    return env

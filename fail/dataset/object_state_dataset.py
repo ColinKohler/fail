@@ -23,11 +23,11 @@ class ObjectStateDataset(BaseDataset):
             harmonic_action=harmonic_action,
             seed=seed,
             val_ratio=val_ratio,
-            max_train_episodes=max_train_episodes
+            max_train_episodes=max_train_episodes,
         )
 
     def _sample_to_data(self, sample):
-        #noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
+        # noise = npr.uniform([-0.010, -0.010, 0.0], [0.010, 0.010, 0])
         data = {
             "robot_state": sample["robot_state"],  # T, D_r
             "world_state": sample["object_state"],  # 1, D_o

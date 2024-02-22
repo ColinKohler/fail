@@ -72,8 +72,8 @@ class ImplicitPolicy(BasePolicy):
 
         nrobot_state = nrobot_state.view(B, 20, 9)
         nworld_state = nworld_state.view(B, 2, 3)
-        #nrobot_state = nrobot_state.unsqueeze(0).flatten(1, 2)
-        #nworld_state = nworld_state.unsqueeze(0).flatten(1,2)
+        # nrobot_state = nrobot_state.unsqueeze(0).flatten(1, 2)
+        # nworld_state = nworld_state.unsqueeze(0).flatten(1,2)
         nrobot_state = nrobot_state.to(device).float()
         nworld_state = nworld_state.to(device).float()
 

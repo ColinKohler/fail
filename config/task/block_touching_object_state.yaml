@@ -5,7 +5,8 @@ world_state_dim: 3
 action_dim: 2
 
 env_runner: 
-  _target_:  fail.env_runner.block_touching_object_state_runner.BlockTouchingObjectStateRunner
+  _target_:  fail.env_runner.drake_object_state_runner.DrakeObjectStateRunner
+  env: block_touching
   num_train: 10
   num_train_vis: 2
   train_start_seed: 0

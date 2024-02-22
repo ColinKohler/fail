@@ -34,7 +34,6 @@ class ReachOracle(py_policy.PyPolicy):
         self._block_pushing_oracles_action_std = block_pushing_oracles_action_std
 
     def _action(self, time_step, policy_state):
-
         # Specifying this as velocity makes it independent of control frequency.
         max_step_velocity = 0.2
 

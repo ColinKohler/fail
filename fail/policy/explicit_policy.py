@@ -16,8 +16,24 @@ class ExplicitPolicy(BasePolicy):
     LOG_SIG_MIN = -20
     EPS = 1e-6
 
-    def __init__(self, robot_state_dim, world_state_dim, action_dim, num_robot_state, num_world_state, num_action_steps, encoder):
-        super().__init__(robot_state_dim, world_state_dim, action_dim, num_robot_state, num_world_state, num_action_steps)
+    def __init__(
+        self,
+        robot_state_dim,
+        world_state_dim,
+        action_dim,
+        num_robot_state,
+        num_world_state,
+        num_action_steps,
+        encoder,
+    ):
+        super().__init__(
+            robot_state_dim,
+            world_state_dim,
+            action_dim,
+            num_robot_state,
+            num_world_state,
+            num_action_steps,
+        )
 
         self.encoder = encoder
         z_dim = self.encoder.z_dim
@@ -51,10 +67,10 @@ class ExplicitPolicy(BasePolicy):
         return action, log_prob, mean
 
     def get_action(self, obs, device):
-        B = obs['robot_state'].shape[0]
+        B = obs["robot_state"].shape[0]
 
-        nrobot_state = self.normalizer["robot_state"].normalize(obs['robot_state'])
-        nworld_state = self.normalizer["world_state"].normalize(obs['world_state'])
+        nrobot_state = self.normalizer["robot_state"].normalize(obs["robot_state"])
+        nworld_state = self.normalizer["world_state"].normalize(obs["world_state"])
 
         Dr = self.robot_state_dim
         Dw = self.world_state_dim
@@ -66,12 +82,12 @@ class ExplicitPolicy(BasePolicy):
             _, _, action = self.sample(nrobot_state, nworld_state)
         actions = self.normalizer["action"].unnormalize(actions)
 
-        return {'action': actions}
+        return {"action": actions}
 
     def compute_loss(self, batch):
         # Load batch
         nrobot_state = batch["robot_state"].float()
-        nworld_state = batch['world_state'].float()
+        nworld_state = batch["world_state"].float()
         naction = batch["action"].float()
 
         Dr = self.robot_state_dim
@@ -87,7 +103,7 @@ class ExplicitPolicy(BasePolicy):
         return loss
 
     def get_action_stats(self):
-        action_stats = self.normalizer['action'].get_output_stats()
+        action_stats = self.normalizer["action"].get_output_stats()
 
         repeated_stats = dict()
         for key, valye in action_stas.items():
