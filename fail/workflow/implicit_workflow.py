@@ -15,7 +15,7 @@ import wandb
 from fail.dataset.base_dataset import BaseDataset
 from fail.workflow.base_workflow import BaseWorkflow
 from fail.policy.implicit_policy import ImplicitPolicy
-from fail.model.modules import PoseForceEncoder
+from fail.model.modules import RobotStateObjectPoseEncoder
 from fail.utils import torch_utils
 from fail.utils.json_logger import JsonLogger
 from fail.utils.checkpoint_manager import TopKCheckpointManager
@@ -35,7 +35,7 @@ class ImplicitWorkflow(BaseWorkflow):
         npr.seed(seed)
         random.seed(seed)
 
-        self.encoder: PoseForceEncoder
+        self.encoder: RobotStateObjectPoseEncoder
         self.encoder = hydra.utils.instantiate(config.encoder)
         self.model: ImplicitPolicy
         self.model = hydra.utils.instantiate(config.policy, encoder=self.encoder)

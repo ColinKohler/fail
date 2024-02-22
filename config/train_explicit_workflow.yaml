@@ -6,29 +6,35 @@ name: train_explicit_policy
 _target_: fail.workflow.explicit_workflow.ExplicitWorkflow
 
 robot_state_dim: ${task.robot_state_dim} 
-world_state_dim: $task.world_state_dim}
+world_state_dim: ${task.world_state_dim}
 action_dim: ${task.action_dim} 
 task_name:  ${task.name}
 exp_name: 'default'
+past_action_visible: False
 
-horizon: 2
-num_obs_steps: 2
 num_action_steps: 1
-z_dim: 1024
+num_obs_steps: 2
+num_robot_state_step: 10
+num_robot_state: ${eval:'${num_obs_steps}*${num_robot_state_step}'}
+num_world_state: ${num_obs_steps}
+z_dim: 256 
 
 policy:
   _target_: fail.policy.explicit_policy.ExplicitPolicy
-  obs_dim: ${obs_dim}
+  robot_state_dim: ${robot_state_dim}
+  world_state_dim: ${world_state_dim}
   action_dim: ${action_dim}
-  num_obs_steps: ${num_obs_steps}
   num_action_steps: ${num_action_steps}
+  num_robot_state: ${num_robot_state}
+  num_world_state: ${num_world_state}
+  z_dim: ${z_dim}
 
 encoder:
   _target_: fail.model.modules.RobotStateObjectPoseEncoder
-  robot_state_dim: ${task.robot_state_dim}
-  object_state_dim: ${task.object_state_dim}
-  robot_state_len: ${task.robot_state_len}
-  object_state_len: ${task.world_state_len}
+  robot_state_dim: ${robot_state_dim}
+  object_state_dim: ${world_state_dim}
+  robot_state_len: ${num_robot_state}
+  object_state_len: ${num_world_state}
   model_dim: 32
   trans_out_dim: 32
   trans_layers: 4
@@ -79,12 +85,12 @@ logging:
 
 checkpoint:
   topk:
-    monitor_key: tast_mean_score
+    monitor_key: test_mean_score
     mode: max
     k: 5
     format_str: 'epoch={epoch:04d}-test_mean_score={test_mean_score:.3f}.ckpt'
-  save_last_checkpoint=True
-  save_last_snapshot=False
+  save_last_checkpoint: True
+  save_last_snapshot: False
 
 multi_run:
   run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}

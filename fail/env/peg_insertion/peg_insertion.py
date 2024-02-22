@@ -67,8 +67,8 @@ from pydrake.solvers import Solve
 from pydrake.common import FindResourceOrThrow
 from pydrake.common.value import AbstractValue
 
-from drake_ws.peg_insertion_envs.base_env import BaseEnv
-from drake_ws.peg_insertion_envs.named_view_helpers import (
+from fail.env.drake_env.base_env import BaseEnv
+from fail.env.drake_env.named_view_helpers import (
     MakeNamedViewBodyPoses,
     MakeNamedViewForces,
 )

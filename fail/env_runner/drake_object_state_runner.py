@@ -9,7 +9,7 @@ import math
 import wandb.sdk.data_types.video as wv
 from fail.env.block_touching.block_touching import BlockTouching
 from fail.env.block_pushing.block_pushing import BlockPushing
-from fail.env.peg_insertion.peg_insertion import PegInsertion
+#from fail.env.peg_insertion.peg_insertion import PegInsertion
 from fail.gym_util.async_vector_env import AsyncVectorEnv
 from fail.gym_util.sync_vector_env import SyncVectorEnv
 from fail.gym_util.multistep_wrapper import MultiStepWrapper

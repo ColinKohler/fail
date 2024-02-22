@@ -1,29 +1,48 @@
 defaults:
   - _self_
-  - task: peg_insertion 
+  - task: block_touching_object_state 
 
-name: train_implicit_policy
+name: train_so2_implicit_policy
 _target_: fail.workflow.implicit_workflow.ImplicitWorkflow
 
 obs_dim: ${task.obs_dim} 
 action_dim: ${task.action_dim}
 task_name: ${task.name}
 exp_name: 'default'
+is_harmonic: False
 
-obs_horizon: 2
-obs_key_points: 10
 n_action_steps: 1
-z_dim: ${task.zdim}
-encoder: ${task.so2_encoder}
+num_obs_steps: 2
+num_robot_state_step: 10
+num_robot_state: ${eval:'${num_obs_steps}*${num_robot_state_step}'}
+num_world_state: ${num_obs_steps}
+z_dim: 256 
 
 policy:
   _target_: fail.policy.implicit_policy.ImplicitPolicy
+  robot_state_dim: ${robot_state_dim}
+  world_state_dim: ${world_state_dim}
   action_dim: ${action_dim}
-  seq_len: ${eval:'${obs_horizon}*${obs_key_points}'}
-  z_dim: ${z_dim}
-  num_neg_act_samples: 1024
+  num_action_steps: ${num_action_steps}
+  num_robot_state: ${num_robot_state}
+  num_world_state: ${num_world_state}
+  num_neg_act_samples: 256
   pred_n_iter: 3
-  pred_n_samples: 2048
+  pred_n_samples: 4096
+  z_dim: ${z_dim}
+  dropout: 0.1
+
+encoder:
+  _target_: fail.model.modules.RobotStateObjectPoseEncoder
+  robot_state_dim: ${robot_state_dim}
+  object_state_dim: ${world_state_dim}
+  robot_state_len: ${num_robot_state}
+  object_state_len: ${num_world_state}
+  model_dim: 64
+  trans_out_dim: 32
+  trans_layers: 4
+  trans_heads: 8
+  z_dim: ${z_dim}
   dropout: 0.1
 
 dataloader:
@@ -53,7 +72,8 @@ training:
   resume: True
   lr_warmup_steps: 500
   num_epochs: 1000
-  checkpoint_every: 100
+  checkpoint_every: 50
+  rollout_every: 50
   val_every: 1
   tqdm_interval_sec: 1.0
 
@@ -65,6 +85,15 @@ logging:
   tags: ["${name}", "${task_name}", "${exp_name}"]
   id: null
   group: null
+
+checkpoint:
+  topk:
+    monitor_key: test_mean_score
+    mode: max
+    k: 5
+    format_str: 'epoch={epoch:04d}-test_mean_score={test_mean_score:.3f}.ckpt'
+  save_last_checkpoint: True
+  save_last_snapshot: False
 
 multi_run:
   run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}

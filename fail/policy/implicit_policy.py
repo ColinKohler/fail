@@ -109,14 +109,14 @@ class ImplicitPolicy(BasePolicy):
         Ta = self.num_action_steps
         B = nrobot_state.shape[0]
 
-        nrobot_state[:, :Tr]
-        nworld_state[:, :Tw]
+        nrobot_state = nrobot_state[:, :Tr]
+        nworld_state = nworld_state[:, :Tw]
         start = 1
         end = start + Ta
         naction = naction[:, start:end]
 
-        robot_state = nrobot_state.flatten(1, 2)
-        world_state = nworld_state.view(B, 2, -1)
+        nrobot_state = nrobot_state.view(B, 20, -1)
+        nworld_state = nworld_state.view(B, 2, -1)
 
         # Add noise to positive samples
         action_noise = torch.normal(
@@ -145,7 +145,7 @@ class ImplicitPolicy(BasePolicy):
         targets = targets[torch.arange(targets.size(0)).unsqueeze(-1), permutation]
         ground_truth = (permutation == 0).nonzero()[:, 1].to(naction.device)
 
-        energy = self.forward(robot_state, world_state, targets)
+        energy = self.forward(nrobot_state, nworld_state, targets)
         loss = F.cross_entropy(energy, ground_truth)
 
         return loss

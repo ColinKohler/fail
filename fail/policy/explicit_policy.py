@@ -24,6 +24,7 @@ class ExplicitPolicy(BasePolicy):
         num_robot_state,
         num_world_state,
         num_action_steps,
+        z_dim,
         encoder,
     ):
         super().__init__(
@@ -36,7 +37,6 @@ class ExplicitPolicy(BasePolicy):
         )
 
         self.encoder = encoder
-        z_dim = self.encoder.z_dim
         self.policy = MLP([z_dim, z_dim // 2, action_dim * 2], act_out=False)
 
         self.apply(torch_utils.init_weights)
@@ -66,20 +66,24 @@ class ExplicitPolicy(BasePolicy):
 
         return action, log_prob, mean
 
-    def get_action(self, obs, device):
-        B = obs["robot_state"].shape[0]
+    def get_action(self, robot_state, world_state, device):
+        nrobot_state = self.normalizer["robot_state"].normalize(np.stack(robot_state))
+        nworld_state = self.normalizer["world_state"].normalize(world_state)
 
-        nrobot_state = self.normalizer["robot_state"].normalize(obs["robot_state"])
-        nworld_state = self.normalizer["world_state"].normalize(obs["world_state"])
-
+        B = nrobot_state.size(0)
         Dr = self.robot_state_dim
         Dw = self.world_state_dim
         Tr = self.num_robot_state
         Tw = self.num_world_state
         Ta = self.num_action_steps
 
+        nrobot_state = nrobot_state.view(B, 20, 9)
+        nworld_state = nworld_state.view(B, 2, 3)
+        nrobot_state = nrobot_state.to(device).float()
+        nworld_state = nworld_state.to(device).float()
+
         with torch.no_grad():
-            _, _, action = self.sample(nrobot_state, nworld_state)
+            _, _, actions = self.sample(nrobot_state, nworld_state)
         actions = self.normalizer["action"].unnormalize(actions)
 
         return {"action": actions}
@@ -90,12 +94,22 @@ class ExplicitPolicy(BasePolicy):
         nworld_state = batch["world_state"].float()
         naction = batch["action"].float()
 
+        Da = self.action_dim
         Dr = self.robot_state_dim
         Dw = self.world_state_dim
         Tr = self.num_robot_state
         Tw = self.num_world_state
         Ta = self.num_action_steps
         B = naction.shape[0]
+
+        nrobot_state = nrobot_state[:, :Tr]
+        nworld_state = nworld_state[:, :Tw]
+        start = 1
+        end = start + Ta
+        naction = naction[:, start:end].squeeze()
+
+        nrobot_state = nrobot_state.view(B, 20, -1)
+        nworld_state = nworld_state.view(B, 2, -1)
 
         mean, log_prob, _ = self.sample(nrobot_state, nworld_state)
         loss = F.mse_loss(mean, naction)
