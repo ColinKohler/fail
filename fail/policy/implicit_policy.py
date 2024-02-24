@@ -41,9 +41,8 @@ class ImplicitPolicy(BasePolicy):
         self.pred_n_samples = pred_n_samples
 
         self.encoder = encoder
-        m_dim = z_dim * 4
         self.energy_mlp = MLP(
-            [z_dim + action_dim, m_dim, m_dim, m_dim, 1], dropout=dropout, act_out=False
+            [z_dim + action_dim, z_dim, z_dim, z_dim, 1], dropout=dropout, act_out=False
         )
 
         self.apply(torch_utils.init_weights)
@@ -62,7 +61,7 @@ class ImplicitPolicy(BasePolicy):
         return out.view(B, N)
 
     def get_action(self, robot_state, world_state, device):
-        nrobot_state = self.normalizer["robot_state"].normalize(np.stack(robot_state))
+        nrobot_state = self.normalizer["robot_state"].normalize(robot_state)
         nworld_state = self.normalizer["world_state"].normalize(world_state)
 
         B = nrobot_state.size(0)

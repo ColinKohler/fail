@@ -18,14 +18,15 @@ class ExplicitPolicy(BasePolicy):
 
     def __init__(
         self,
-        robot_state_dim,
-        world_state_dim,
-        action_dim,
-        num_robot_state,
-        num_world_state,
-        num_action_steps,
-        z_dim,
-        encoder,
+        robot_state_dim: int,
+        world_state_dim: int,
+        action_dim: int,
+        num_robot_state: int,
+        num_world_state: int,
+        num_action_steps: int,
+        z_dim: int,
+        dropout: float,
+        encoder: nn.Module,
     ):
         super().__init__(
             robot_state_dim,
@@ -37,7 +38,7 @@ class ExplicitPolicy(BasePolicy):
         )
 
         self.encoder = encoder
-        self.policy = MLP([z_dim, z_dim // 2, action_dim * 2], act_out=False)
+        self.policy = MLP([z_dim, z_dim, z_dim, z_dim, action_dim * 2], dropout=dropout, act_out=False)
 
         self.apply(torch_utils.init_weights)
 
@@ -67,7 +68,7 @@ class ExplicitPolicy(BasePolicy):
         return action, log_prob, mean
 
     def get_action(self, robot_state, world_state, device):
-        nrobot_state = self.normalizer["robot_state"].normalize(np.stack(robot_state))
+        nrobot_state = self.normalizer["robot_state"].normalize(robot_state)
         nworld_state = self.normalizer["world_state"].normalize(world_state)
 
         B = nrobot_state.size(0)

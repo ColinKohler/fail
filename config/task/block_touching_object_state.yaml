@@ -7,13 +7,13 @@ action_dim: 2
 env_runner: 
   _target_:  fail.env_runner.drake_object_state_runner.DrakeObjectStateRunner
   env: block_touching
-  num_train: 5
+  num_train: 10
   num_train_vis: 2
   train_start_seed: 0
-  num_test: 10
+  num_test: 50
   num_test_vis: 10
   test_start_seed: 100000
-  max_steps: 100
+  max_steps: 300
   num_obs_steps: ${num_obs_steps}
   num_action_steps: ${num_action_steps}
   fps: 5

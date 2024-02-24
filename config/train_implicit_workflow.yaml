@@ -18,7 +18,15 @@ num_obs_steps: 2
 num_robot_state_step: 10
 num_robot_state: ${eval:'${num_obs_steps}*${num_robot_state_step}'}
 num_world_state: ${num_obs_steps}
-z_dim: 256 
+z_dim: 512 
+model_dim: 128
+trans_out_dim: 128
+trans_layers: 4
+trans_heads: 8
+lr: 1e-3
+dropout: 0.1
+
+num_neg_act_samples: 256
 
 policy:
   _target_: fail.policy.implicit_policy.ImplicitPolicy
@@ -28,10 +36,11 @@ policy:
   num_action_steps: ${num_action_steps}
   num_robot_state: ${num_robot_state}
   num_world_state: ${num_world_state}
-  num_neg_act_samples: 256
+  num_neg_act_samples: ${num_neg_act_samples}
   pred_n_iter: 3
   pred_n_samples: 4096
   z_dim: ${z_dim}
+  dropout: ${dropout}
 
 encoder:
   _target_: fail.model.modules.RobotStateObjectPoseEncoder
@@ -39,12 +48,12 @@ encoder:
   object_state_dim: ${world_state_dim}
   robot_state_len: ${num_robot_state}
   object_state_len: ${num_world_state}
-  model_dim: 64
-  trans_out_dim: 32
-  trans_layers: 4
-  trans_heads: 8
+  model_dim: ${model_dim}
+  trans_out_dim: ${trans_out_dim}
+  trans_layers: ${trans_layers}
+  trans_heads: ${trans_heads}
   z_dim: ${z_dim}
-  dropout: 0.1
+  dropout: ${dropout}
 
 dataloader:
   batch_size: 256
@@ -73,8 +82,8 @@ training:
   resume: True
   lr_warmup_steps: 500
   num_epochs: 1000
-  checkpoint_every: 50
-  rollout_every: 50
+  checkpoint_every: 100
+  rollout_every: 100
   val_every: 1
   tqdm_interval_sec: 1.0
 

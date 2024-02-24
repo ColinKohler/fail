@@ -136,7 +136,7 @@ class ObservationPublisher(LeafSystem):
         robot_T_peg = robot_T_world.multiply(world_T_peg)
 
         self.force_history.append(force)
-        self.pose_history.append(robot_T_peg.translation())
+        self.pose_history.append(robot_T_peg.translation().tolist())
 
     def getWorldState(self, context, output):
         poses = self.pose_view(self.poses_port.Eval(context))
@@ -158,11 +158,11 @@ class ObservationPublisher(LeafSystem):
             pose = np.array([robot_T_peg.translation()] * self.state_len)
 
             self.initial_force = None
-            self.force_history = [[0] * 6]
-            self.pose_history = [pose.tolist()]
+            self.force_history = force.tolist()
+            self.pose_history = pose.tolist()
         else:
-            pose = np.array(self.pose_history[-self.state_len :])
-            force = np.array(self.force_history[-self.state_len :])
+            pose = np.array(self.pose_history[-self.state_len:])
+            force = np.array(self.force_history[-self.state_len:])
 
         # Low-pass filter on force data
         fs = 100  # Sample rate (Hz)
@@ -458,7 +458,7 @@ class BlockTouchingSim(object):
             rs = npr.RandomState(seed=seed)
 
             # Randomly sample poses for the block
-            block_pos = [rs.uniform(0.4, 0.65), rs.uniform(-0.1, 0.1), 0.025]
+            block_pos = [rs.uniform(0.45, 0.6), rs.uniform(-0.075, 0.075), 0.025]
             self.block_pos = block_pos
 
             robot_T_block = RigidTransform(RollPitchYaw([np.pi / 2, 0, 0]), p=block_pos)
@@ -469,7 +469,7 @@ class BlockTouchingSim(object):
 
             # TODO: Fix this mess w/choice causing z axis issues
             peg_pos = [rs.uniform(0.4, 0.6), rs.uniform(-0.1, 0.1), 0.2]
-            while np.allclose(peg_pos[:2], block_pos[:2], atol=2e-2):
+            while np.allclose(peg_pos[:2], block_pos[:2], atol=5e-2):
                 peg_pos = [rs.uniform(0.4, 0.6), rs.uniform(-0.1, 0.1), 0.2]
             robot_T_hand = RigidTransform(
                 RotationMatrix(q2r([0, 1, 0, 0])), p=peg_pos

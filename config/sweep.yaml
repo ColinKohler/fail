@@ -1,0 +1,23 @@
+program: scripts/train.py
+name: sweep_test
+method: bayes
+metric:
+  goal: maximize
+  name: test/mean_score
+parameters:
+  lr: 
+    values: [1e-2, 1e-3, 1e-4]
+  z_dim:
+    values: [256, 512, 1024]
+  model_dim:
+    values: [32, 64, 128]
+  trans_out_dim:
+    values: [32, 64, 128]
+
+command:
+  - python3
+  - ${program}
+  - --config-name
+  - train_implicit_workflow
+  - training.device=cuda:2
+  - ${args_no_hyphens}

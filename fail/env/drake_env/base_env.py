@@ -117,6 +117,7 @@ class BaseEnv(gym.Env):
             status.reason() == SimulatorStatus.ReturnReason.kReachedTerminationCondition
         )
 
+
         return obs, reward, terminated, dict()
 
     def reset(self):
